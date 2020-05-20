@@ -6,7 +6,7 @@
   <arg name="x_pos" default="0.0" />
   <arg name="y_pos" default="0.0" />
   <arg name="z_pos" default="0.0" />
-  <arg name="world" default="challenge_maze_no_coins.world" />
+  <arg name="world" default="challenge_maze_double_entry.world" />
 
   <!-- Export env variable so that gazebo finds the models and materials -->
   <env name="GAZEBO_MODEL_PATH" value="$(find labyrinth_turtlebot)/models" />
