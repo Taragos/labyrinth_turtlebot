@@ -34,4 +34,6 @@
 
   <node name="rviz" pkg="rviz" type="rviz" />
 
+  <node name="coordinator" pkg="labyrinth_turtlebot" type="coordinator.py" />
+
 </launch>
