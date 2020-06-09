@@ -3,13 +3,22 @@
 
   <!-- ALL ARGUMENTS-->
   <arg name="model" default="burger" doc="model type [burger, waffle, waffle_pi]"/>
-  <arg name="x_pos" default="11.0" />
-  <arg name="y_pos" default="8.2" />
-  <arg name="z_pos" default="0.0" />
+  <arg name="initial_x" default="11" />
+  <arg name="initial_y" default="8" />
+  <arg name="initial_z" default="0" />
   <arg name="roll" default="0"/>
   <arg name="pitch" default="0"/>
-  <arg name="yaw" default="180"/>
+  <arg name="yaw" default="3"/>
+  <arg name="des_x" default="-4" />
+  <arg name="des_y" default="8" />
+  <param name="initial_x" value="$(arg initial_x)" />
+  <param name="initial_y" value="$(arg initial_y)" />
+  <param name="des_pos_x" value="$(arg des_x)" />
+  <param name="des_pos_y" value="$(arg des_y)" />
   <arg name="world" default="challenge_maze_double_entry.world" />
+  <arg name="scan_topic"  default="/scan" />
+  <arg name="base_frame"  default="base_footprint"/>
+  <arg name="odom_frame"  default="odom"/>
 
   <!-- Export env variable so that gazebo finds the models and materials -->
   <env name="GAZEBO_MODEL_PATH" value="$(find labyrinth_turtlebot)/models" />
@@ -29,14 +38,64 @@
   </include>
 
 
-  <node pkg="gazebo_ros" type="spawn_model" name="spawn_urdf" args="-urdf -model turtlebot3_$(arg model) -x $(arg x_pos) -y $(arg y_pos) -z $(arg z_pos) -R $(arg roll) -P $(arg pitch) -Y $(arg yaw) -param robot_description" />
+  <node pkg="gazebo_ros" type="spawn_model" name="spawn_urdf" args="-urdf -model turtlebot3_$(arg model) -x $(arg initial_x) -y $(arg initial_y) -z $(arg initial_z) -R $(arg roll) -P $(arg pitch) -Y $(arg yaw) -param robot_description" />
 
   <node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher">
     <param name="publish_frequency" type="double" value="50.0" />
   </node>
 
-  <node name="rviz" pkg="rviz" type="rviz" />
+  <node pkg="rviz" name="rviz" type="rviz" />
 
-  <node name="coordinator" pkg="labyrinth_turtlebot" type="coordinator.py" />
+  <node pkg="labyrinth_turtlebot" name="start_stop_server" type="start_stop_server.py" />
+  <node pkg="labyrinth_turtlebot" name="find_the_entry" type="find_the_entry.py"/>
+  <node pkg="labyrinth_turtlebot" name="follow_wall" type="follow_wall.py"/>
+  <node pkg="labyrinth_turtlebot" name="coordinator" type="coordinator.py" />
+<!--  <node pkg="labyrinth_turtlebot" type="go_to_point.py" name="go_to_point" />-->
+<!--  <node pkg="labyrinth_turtlebot" type="pathfinding.py" name="pathfinding" />-->
+
+  <node pkg="gmapping" type="slam_gmapping" name="slam_gmapping" output="screen">
+    <param name="base_frame" value="$(arg base_frame)"/>
+    <param name="odom_frame" value="$(arg odom_frame)"/>
+    <param name="map_update_interval" value="5.0"/>
+    <param name="maxUrange" value="6.0"/>
+    <param name="maxRange" value="8.0"/>
+    <param name="sigma" value="0.05"/>
+    <param name="kernelSize" value="1"/>
+    <param name="lstep" value="0.05"/>
+    <param name="astep" value="0.05"/>
+    <param name="iterations" value="5"/>
+    <param name="lsigma" value="0.075"/>
+    <param name="ogain" value="3.0"/>
+    <param name="lskip" value="0"/>
+    <param name="minimumScore" value="200"/>
+    <param name="srr" value="0.01"/>
+    <param name="srt" value="0.02"/>
+    <param name="str" value="0.01"/>
+    <param name="stt" value="0.02"/>
+    <param name="linearUpdate" value="0.5"/>
+    <param name="angularUpdate" value="0.436"/>
+    <param name="temporalUpdate" value="-1.0"/>
+    <param name="resampleThreshold" value="0.5"/>
+    <param name="particles" value="80"/>
+  <!--
+    <param name="xmin" value="-50.0"/>
+    <param name="ymin" value="-50.0"/>
+    <param name="xmax" value="50.0"/>
+    <param name="ymax" value="50.0"/>
+  make the starting size small for the benefit of the Android client's memory...
+  -->
+    <param name="xmin" value="-1.0"/>
+    <param name="ymin" value="-1.0"/>
+    <param name="xmax" value="1.0"/>
+    <param name="ymax" value="1.0"/>
+
+    <param name="delta" value="0.05"/>
+    <param name="llsamplerange" value="0.01"/>
+    <param name="llsamplestep" value="0.01"/>
+    <param name="lasamplerange" value="0.005"/>
+    <param name="lasamplestep" value="0.005"/>
+    <remap from="scan" to="$(arg scan_topic)"/>
+  </node>
+
 
 </launch>
