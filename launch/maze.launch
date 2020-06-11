@@ -47,9 +47,11 @@
   <node pkg="rviz" name="rviz" type="rviz" args="-d $(find labyrinth_turtlebot)/config/rviz_config.rviz"  />
 
   <node pkg="labyrinth_turtlebot" name="start_stop_server" type="start_stop_server.py" />
+  <node pkg="labyrinth_turtlebot" name="in_lab_server" type="in_lab_server.py" />
   <node pkg="labyrinth_turtlebot" name="find_the_entry" type="find_the_entry.py"/>
   <node pkg="labyrinth_turtlebot" name="follow_wall" type="follow_wall.py"/>
   <node pkg="labyrinth_turtlebot" name="coordinator" type="coordinator.py" />
+  <node pkg="labyrinth_turtlebot" name="map_handler" type="map_handler.py"  output="screen"/>
 <!--  <node pkg="labyrinth_turtlebot" type="go_to_point.py" name="go_to_point" />-->
 <!--  <node pkg="labyrinth_turtlebot" type="pathfinding.py" name="pathfinding" />-->
   <node pkg="slam_karto" type="slam_karto" name="slam_karto" output="screen">

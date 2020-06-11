@@ -1,0 +1,8 @@
+# State as Int:
+# 0: sleep
+# 1: find_entry
+# 2: follow_wall
+uint8 state
+---
+bool success
+string msgentry
