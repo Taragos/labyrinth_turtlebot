@@ -14,6 +14,8 @@ map_origin_ = position_ = Point()
 resolution_ = 0.5
 height_ = width_ = 0.0
 map_data_ = []
+markers_ = []
+a_star_vis = MarkerArray()
 
 
 class Node():
@@ -92,6 +94,7 @@ def astar(maze, start, end):
 
             # Make sure walkable terrain
             if maze[index] == 100:
+                # add_red_marker(node_position[0], node_position[1], index)
                 continue
 
             # Create new node
@@ -99,6 +102,7 @@ def astar(maze, start, end):
 
             # Append
             children.append(new_node)
+            # add_green_marker(node_position[0], node_position[1], index)
 
         rospy.loginfo("Children: %s" % children)
         # Loop through children
@@ -177,7 +181,7 @@ def publish_path(data):
         marker.scale.y = resolution_
         marker.scale.z = 0.01
         marker.color.a = 0.5
-        marker.color.r = 0.0
+        marker.color.r = 1.0
         marker.color.g = 1.0
         marker.color.b = 0.0
         counter = counter + 1
