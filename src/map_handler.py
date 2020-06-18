@@ -7,16 +7,19 @@ from std_msgs.msg import Bool, Header
 from std_srvs.srv import SetBool
 from visualization_msgs.msg import Marker, MarkerArray
 from rospy import Time
-import numpy as np
+import math
 
 pub_visualization_marker_ = pub_path_ = None
 map_origin_ = position_ = Point()
-resolution_ = 0.5
+resolution_ = 0.5  # resolution in m per square -> 0.05 ~ one square = 5cm
 height_ = width_ = 0.0
 map_data_ = []
 markers_ = []
 a_star_vis = MarkerArray()
-
+turtlebot_radius_ = 11 # radius of turtlebot = 105mm in cm ~ 11cm
+last_wall_ = 0
+check_positions_ = []
+last_wall_direction = 0
 
 class Node():
     """
@@ -33,10 +36,53 @@ class Node():
     def __eq__(self, other):
         return self.position == other.position
 
+def setup_wall_distance():
+    global check_positions_
+    min_dist_in_squares = int(math.ceil(turtlebot_radius_ / (resolution_ * 100))) 
+    # Rechts                                                                 # ----------------------------------------------> y
+    for i in range(1, min_dist_in_squares):                                  # |                          (-1,0)
+        check_positions_.append((0, i))                                      # |                             A
+    # Runter                                                                 # |                             |
+    for i in range(1, min_dist_in_squares):                                  # |                             |
+        check_positions_.append((i, 0))                                      # |              (0, -1) <----- R ----> (0, 1)       
+    # Links                                                                  # |                             |
+    for i in range(1, min_dist_in_squares):                                  # |                             |
+        check_positions_.append((0, -i))                                     # V                             V
+    # Hoch                                                                   # x                          (1, 0)
+    for i in range(1, min_dist_in_squares):
+        check_positions_.append((-i, 0))
+
+# checks if there is a wall somewhere close to the current node, that the turtlebot might bump into
+def check_for_wall(current_position, maze):
+    global last_wall_direction
+    rospy.loginfo(check_positions_)
+    run = True
+    start_index = last_wall_direction
+    while run:
+        new_position = check_positions_[last_wall_direction]        
+        node_position = (current_position[0] + new_position[0], current_position[1] + new_position[1])
+        
+        if node_position[0] < 0 or node_position[1] < 0:
+            return False
+
+        index = get_index(node_position[0], node_position[1])
+
+        if index < 0 or index >= len(maze):
+            return True
+
+            # Make sure walkable terrain
+        if maze[index] == 100:
+            # add_red_marker(node_position[0], node_position[1], index)
+            return True
+
+        last_wall_direction = (last_wall_direction + 1) % len(check_positions_) 
+        if start_index is last_wall_direction:
+            run = False        
+    return False
 
 def astar(maze, start, end):
     """Returns a list of tuples as a path from the given start to the given end in the given maze"""
-
+    setup_wall_distance()
     # Create start and end node
     start_node = Node(None, start)
     start_node.g = start_node.h = start_node.f = 0
@@ -97,6 +143,8 @@ def astar(maze, start, end):
                 # add_red_marker(node_position[0], node_position[1], index)
                 continue
 
+            if check_for_wall(node_position, maze):
+                continue
             # Create new node
             new_node = Node(current_node, node_position)
 
