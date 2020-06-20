@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+import time
+
 import rospy
 from geometry_msgs.msg import Twist, Point
 from nav_msgs.msg import Odometry
@@ -11,6 +13,7 @@ startStop_ = False
 in_lab_ = False
 path_found_ = False
 srv_client_go_to_point_ = None
+pub_cmd_ = None
 
 path = None
 position_ = Point()
@@ -80,6 +83,16 @@ def clbk_odom(msg):
     yaw_ = euler[2]
 
 
+def drive_back():
+    global pub_cmd_
+    change_state(0)
+    twist_msg = Twist()
+    twist_msg.linear.x = -0.2
+    pub_cmd_.publish(twist_msg)
+    time.sleep(2)
+    change_state(1)
+
+
 def change_state(state):
     global srv_client_go_to_point_
     if state == 1:
@@ -89,7 +102,7 @@ def change_state(state):
 
 
 def coordinator():
-    global in_lab_, startStop_, path_found_, srv_client_go_to_point_, pub_path_change
+    global in_lab_, startStop_, path_found_, srv_client_go_to_point_, pub_path_change, pub_cmd_
 
     rospy.init_node('coordinator')
 
@@ -100,6 +113,7 @@ def coordinator():
     rospy.wait_for_service('/go_to_point_switch')
 
     pub_path_change = rospy.Publisher('/path_change', Bool, queue_size=10)
+    pub_cmd_ = rospy.Publisher('/cmd_vel', Twist, queue_size=1)
 
     sub_drive = rospy.Subscriber('/start_stop', Bool, clbk_drive)
     sub_lab = rospy.Subscriber('/in_lab', Bool, clbk_lab)

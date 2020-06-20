@@ -117,15 +117,17 @@ def go_straight_ahead(des_pos):
 
 def set_destination():
     global desired_position_, corner_count_
+    # Get destination coordinates
     if rospy.has_param('/path_corner_points'):
         path_corners = rospy.get_param("/path_corner_points")
-
+    # if final destination reached stop the robot
     if corner_count_ >= len(path_corners):
         twist_msg = Twist()
         twist_msg.linear.x = 0
         twist_msg.angular.z = 0
         pub_cmd_.publish(twist_msg)
         corner_count_ = 0
+    # set new destination
     else:
         desired_position_.x = path_corners[corner_count_]["x"]
         desired_position_.y = path_corners[corner_count_]["y"]
@@ -133,11 +135,11 @@ def set_destination():
         change_state(0)
 
 
-def done():
-    twist_msg = Twist()
-    twist_msg.linear.x = 0
-    twist_msg.angular.z = 0
-    pub_cmd_.publish(twist_msg)
+# def done():
+#     twist_msg = Twist()
+#     twist_msg.linear.x = 0
+#     twist_msg.angular.z = 0
+#     pub_cmd_.publish(twist_msg)
 
 
 def main():
