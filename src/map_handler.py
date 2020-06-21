@@ -23,7 +23,9 @@ turtlebot_radius_ = 11  # radius of turtlebot = 105mm in cm ~ 11cm
 last_wall_ = 0
 check_positions_ = []
 last_wall_direction = 0
-
+map_update_frequency_ = 2 # e.g. = 2 -> every second map update, update the path
+map_update_counter_ = 0
+bad_map_ = {}
 
 class Node():
     """
@@ -38,7 +40,7 @@ class Node():
         self.f = 0
 
     def __eq__(self, other):
-        return self.position == other.position
+        return self.position[0] == other.position[0] and self.position[1] == other.position[1]
 
 # ----------------------------------------------> y
 # |                          (-1,0)
@@ -58,30 +60,29 @@ def setup_wall_distance():
         check_positions_.append((0, i))                                      
     # Unten Rechts
     for i in range(1, min_dist_in_squares):                                  
-        check_positions_.append((min_dist_in_squares, min_dist_in_squares)) # rechts unten
+        check_positions_.append((i, i)) # rechts unten
     # Runter                                                                 
     for i in range(1, min_dist_in_squares):                                  
         check_positions_.append((i, 0))
     # Unten Links
     for i in range(1, min_dist_in_squares):                                  
-        check_positions_.append((min_dist_in_squares, -min_dist_in_squares))                                        
+        check_positions_.append((i, -i))                                        
     # Links                                                                  
     for i in range(1, min_dist_in_squares):                                  
         check_positions_.append((0, -i))                                     
     # Oben Links
     for i in range(1, min_dist_in_squares):                                  
-        check_positions_.append((-min_dist_in_squares, -min_dist_in_squares))   
+        check_positions_.append((-i, -i))   
     # Hoch                                                                   
     for i in range(1, min_dist_in_squares):
         check_positions_.append((-i, 0))
     # Oben Rechts
     for i in range(1, min_dist_in_squares):                                  
-        check_positions_.append((-min_dist_in_squares, min_dist_in_squares))       
+        check_positions_.append((-i, i))       
 
 # checks if there is a wall somewhere close to the current node, that the turtlebot might bump into
 def check_for_wall(current_position, maze):
     global last_wall_direction
-    rospy.loginfo(check_positions_)
     run = True
     start_index = last_wall_direction
     while run:
@@ -96,9 +97,8 @@ def check_for_wall(current_position, maze):
         if index < 0 or index >= len(maze):
             return True
 
-            # Make sure walkable terrain
+        # Make sure walkable terrain
         if maze[index] == 100:
-            # add_red_marker(node_position[0], node_position[1], index)
             return True
 
         last_wall_direction = (last_wall_direction + 1) % len(check_positions_)
@@ -107,9 +107,13 @@ def check_for_wall(current_position, maze):
     return False
 
 
+def add_to_bad_map(x_i, y_i):
+    global bad_map_
+
+    bad_map_[x_i] = y_i
+
 def astar(maze, start, end):
     """Returns a list of tuples as a path from the given start to the given end in the given maze"""
-    setup_wall_distance()
     # Create start and end node
     start_node = Node(None, start)
     start_node.g = start_node.h = start_node.f = 0
@@ -159,34 +163,41 @@ def astar(maze, start, end):
                 continue
 
             rospy.loginfo("Child Node Pos: %s " % (node_position,))
+            
+            if node_position[0] in bad_map_.keys() and bad_map_[node_position[0]] == node_position[1]:
+                continue
+
             # Make sure within range
             index = get_index(node_position[0], node_position[1])
             rospy.loginfo("Child Index: %s " % str(index))
             if index < 0 or index >= len(maze):
+                add_to_bad_map(node_position[0], node_position[1])
                 continue
 
             # Make sure walkable terrain
             if maze[index] == 100:
                 # add_red_marker(node_position[0], node_position[1], index)
+                add_to_bad_map(node_position[0], node_position[1])
                 continue
 
             if check_for_wall(node_position, maze):
+                add_to_bad_map(node_position[0], node_position[1])
                 continue
+
             # Create new node
             new_node = Node(current_node, node_position)
 
             # Append
             children.append(new_node)
-            # add_green_marker(node_position[0], node_position[1], index)
 
         rospy.loginfo("Children: %s" % children)
         # Loop through children
         for child in children:
 
             # Child is on the closed list
-            for closed_child in closed_list:
-                if child == closed_child:
-                    continue
+            if child in closed_list:
+                rospy.loginfo("Child: %s" % (child.position,))
+                continue
 
             # Create the f, g, and h values
             child.g = current_node.g + 1
@@ -202,7 +213,6 @@ def astar(maze, start, end):
             # Add the child to the open list
             open_list.append(child)
 
-
 # callbacks
 def clbk_odom(msg):
     global position_
@@ -212,7 +222,7 @@ def clbk_odom(msg):
 
 
 def clbk_map(msg):
-    global map_origin_, resolution_, height_, width_, map_data_
+    global map_origin_, resolution_, height_, width_, map_data_, map_update_counter_
 
     # Sets Global Variables
     map_origin_ = Point(
@@ -224,19 +234,27 @@ def clbk_map(msg):
     width_ = msg.info.width
     map_data_ = msg.data
 
-    # Get Square closest to TurtleBot Position
-    x_i, y_i = get_closest_square(position_.x, position_.y)
-    rospy.loginfo("X_I: " + str(x_i) + ", Y_I: " + str(y_i))
-    start = time.time()
-    path = astar(map_data_, (x_i, y_i), (0, 0))
-    end = time.time()
-    rospy.loginfo(path)
-    rospy.loginfo(end - start)
-    publish_path(path)
-    # Get the Square Indices that are closest to the TurtleBot Square and is occupied
+    if len(check_positions_) == 0:
+        setup_wall_distance()
 
-    # marker_closest_square(s_x, s_y)
+    if (map_update_counter_ % map_update_frequency_) == 0:
+        # Get Square closest to TurtleBot Position
+        x_i, y_i = get_closest_square(position_.x, position_.y)
 
+        rospy.loginfo("X_I: " + str(x_i) + ", Y_I: " + str(y_i))
+
+        # Find path to goal via a-star        
+        start = time.time()
+        path = astar(map_data_, (x_i, y_i), (0, 0))
+        end = time.time()
+
+        # Log metrics
+        rospy.loginfo(path)
+        rospy.loginfo(end - start)
+
+        publish_path(path)
+
+    map_update_counter_ = map_update_counter_ + 1
 
 def publish_path(data):
     path = MarkerArray()
@@ -275,7 +293,6 @@ def publish_path(data):
 def map_indices_to_position(x_i, y_i):
     """Converts the given map indices to the real world x and y positions 
 
-    
     Parameters:  \n
     x_i (int): X Index of Square\n
     y_i (int): Y Index of Square\n
@@ -333,7 +350,6 @@ def get_closest_occupied_square(x_i, y_i):
                 return x_i, y_i
         level = level + 1
     return 1, 1
-
 
 def is_occupied(x_i, y_i):
     i = get_index(x_i, y_i)
