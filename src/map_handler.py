@@ -8,6 +8,9 @@ from std_srvs.srv import SetBool
 from visualization_msgs.msg import Marker, MarkerArray
 from rospy import Time
 import math
+import time
+
+
 
 pub_visualization_marker_ = pub_path_ = None
 map_origin_ = position_ = Point()
@@ -37,23 +40,43 @@ class Node():
     def __eq__(self, other):
         return self.position == other.position
 
-
+# ----------------------------------------------> y
+# |                          (-1,0)
+# |                             A
+# |                             |
+# |                             |
+# |              (0, -1) <----- R ----> (0, 1)
+# |                             |
+# |                             |
+# V                             V
+# x                          (1, 0)
 def setup_wall_distance():
     global check_positions_
-    min_dist_in_squares = int(math.ceil(turtlebot_radius_ / (resolution_ * 100)))
-    # Rechts                                                                 # ----------------------------------------------> y
-    for i in range(1, min_dist_in_squares):  # |                          (-1,0)
-        check_positions_.append((0, i))  # |                             A
-    # Runter                                                                 # |                             |
-    for i in range(1, min_dist_in_squares):  # |                             |
-        check_positions_.append((i, 0))  # |              (0, -1) <----- R ----> (0, 1)
-    # Links                                                                  # |                             |
-    for i in range(1, min_dist_in_squares):  # |                             |
-        check_positions_.append((0, -i))  # V                             V
-    # Hoch                                                                   # x                          (1, 0)
+    min_dist_in_squares = int(math.ceil(turtlebot_radius_ / (resolution_ * 100))) + 1
+    # Rechts                                                                 
+    for i in range(1, min_dist_in_squares):                                  
+        check_positions_.append((0, i))                                      
+    # Unten Rechts
+    for i in range(1, min_dist_in_squares):                                  
+        check_positions_.append((min_dist_in_squares, min_dist_in_squares)) # rechts unten
+    # Runter                                                                 
+    for i in range(1, min_dist_in_squares):                                  
+        check_positions_.append((i, 0))
+    # Unten Links
+    for i in range(1, min_dist_in_squares):                                  
+        check_positions_.append((min_dist_in_squares, -min_dist_in_squares))                                        
+    # Links                                                                  
+    for i in range(1, min_dist_in_squares):                                  
+        check_positions_.append((0, -i))                                     
+    # Oben Links
+    for i in range(1, min_dist_in_squares):                                  
+        check_positions_.append((-min_dist_in_squares, -min_dist_in_squares))   
+    # Hoch                                                                   
     for i in range(1, min_dist_in_squares):
         check_positions_.append((-i, 0))
-
+    # Oben Rechts
+    for i in range(1, min_dist_in_squares):                                  
+        check_positions_.append((-min_dist_in_squares, min_dist_in_squares))       
 
 # checks if there is a wall somewhere close to the current node, that the turtlebot might bump into
 def check_for_wall(current_position, maze):
@@ -204,8 +227,11 @@ def clbk_map(msg):
     # Get Square closest to TurtleBot Position
     x_i, y_i = get_closest_square(position_.x, position_.y)
     rospy.loginfo("X_I: " + str(x_i) + ", Y_I: " + str(y_i))
+    start = time.time()
     path = astar(map_data_, (x_i, y_i), (0, 0))
+    end = time.time()
     rospy.loginfo(path)
+    rospy.loginfo(end - start)
     publish_path(path)
     # Get the Square Indices that are closest to the TurtleBot Square and is occupied
 
