@@ -100,7 +100,7 @@ def take_action():
 
 def find_wall():
     msg = Twist()
-    msg.linear.x = 0.2
+    msg.linear.x = 0.3
     msg.angular.z = -0.3
     return msg
 
@@ -115,7 +115,7 @@ def follow_the_wall():
     global regions_
 
     msg = Twist()
-    msg.linear.x = 0.2
+    msg.linear.x = 0.3
     return msg
 
 
@@ -124,13 +124,12 @@ def main():
 
     rospy.init_node('follow_wall')
 
+    srv = rospy.Service('wall_follower_switch', SetBool, wall_follower_switch)
+
     pub_cmd_vel_ = rospy.Publisher('/cmd_vel', Twist, queue_size=1)
 
     sub_scan = rospy.Subscriber('/scan', LaserScan, clbk_laser)
-
     sub_drive = rospy.Subscriber('/start_stop', Bool, clbk_drive)
-
-    srv = rospy.Service('wall_follower_switch', SetBool, wall_follower_switch)
 
     rate = rospy.Rate(20)
     while not rospy.is_shutdown():

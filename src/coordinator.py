@@ -9,17 +9,24 @@ from std_srvs.srv import SetBool
 from tf import transformations
 from visualization_msgs.msg import MarkerArray
 
-startStop_ = False
-in_lab_ = False
-path_found_ = False
+# Services
+srv_client_find_the_entry_ = None
+srv_client_wall_follower_ = None
 srv_client_go_to_point_ = None
-pub_cmd_ = None
 
+# Publisher
+pub_cmd_ = None
+pub_path_change = None
+
+# Parameters
 path = None
 position_ = Point()
 yaw_ = 0
-
-pub_path_change = None
+a_star_ = False
+entry_found_ = False
+startStop_ = False
+in_lab_ = False
+path_found_ = False
 
 
 def clbk_drive(msg):
@@ -30,6 +37,11 @@ def clbk_drive(msg):
 def clbk_lab(msg):
     global in_lab_
     in_lab_ = msg.data
+
+
+def clbk_entry(msg):
+    global entry_found_
+    entry_found_ = msg.data
 
 
 def clbk_path(msg):
@@ -85,32 +97,52 @@ def clbk_odom(msg):
 
 def drive_back():
     global pub_cmd_
-    change_state(0)
+    change_state(3)
     twist_msg = Twist()
     twist_msg.linear.x = -0.2
     pub_cmd_.publish(twist_msg)
     time.sleep(2)
-    change_state(1)
 
 
+# 0 = Find entry,
+# 1 = Follow wall,
+# 2 = use a-star
 def change_state(state):
-    global srv_client_go_to_point_
-    if state == 1:
+    global srv_client_find_the_entry_, srv_client_go_to_point_, srv_client_wall_follower_
+    if state == 0:
+        resp = srv_client_find_the_entry_(True)
+        resp = srv_client_wall_follower_(False)
+        resp = srv_client_go_to_point_(False)
+    elif state == 1:
+        resp = srv_client_find_the_entry_(False)
+        resp = srv_client_wall_follower_(True)
+        resp = srv_client_go_to_point_(False)
+    elif state == 2:
+        resp = srv_client_find_the_entry_(False)
+        resp = srv_client_wall_follower_(False)
         resp = srv_client_go_to_point_(True)
-    else:
+    elif state == 3:
+        resp = srv_client_find_the_entry_(False)
+        resp = srv_client_wall_follower_(False)
         resp = srv_client_go_to_point_(False)
 
 
 def coordinator():
-    global in_lab_, startStop_, path_found_, srv_client_go_to_point_, pub_path_change, pub_cmd_
+    global in_lab_, startStop_, path_found_, entry_found_, a_star_
+    global pub_path_change, pub_cmd_
+    global srv_client_find_the_entry_, srv_client_wall_follower_, srv_client_go_to_point_
 
     rospy.init_node('coordinator')
 
-    pub_cmd = rospy.Publisher('cmd_vel', Twist, queue_size=10)
-
     rospy.wait_for_service('/start_stop')
     rospy.wait_for_service('/in_lab')
+    rospy.wait_for_service('/find_the_entry_switch')
+    rospy.wait_for_service('/wall_follower_switch')
     rospy.wait_for_service('/go_to_point_switch')
+
+    srv_client_find_the_entry_ = rospy.ServiceProxy('/find_the_entry_switch', SetBool)
+    srv_client_wall_follower_ = rospy.ServiceProxy('/wall_follower_switch', SetBool)
+    srv_client_go_to_point_ = rospy.ServiceProxy('/go_to_point_switch', SetBool)
 
     pub_path_change = rospy.Publisher('/path_change', Bool, queue_size=10)
     pub_cmd_ = rospy.Publisher('/cmd_vel', Twist, queue_size=1)
@@ -118,17 +150,19 @@ def coordinator():
     sub_drive = rospy.Subscriber('/start_stop', Bool, clbk_drive)
     sub_lab = rospy.Subscriber('/in_lab', Bool, clbk_lab)
     sub_path = rospy.Subscriber('/a_path', MarkerArray, clbk_path)
+    sub_entry = rospy.Subscriber('/entry', Bool, clbk_entry)
     sub_odom = rospy.Subscriber('/odom', Odometry, clbk_odom)
-
-    srv_client_go_to_point_ = rospy.ServiceProxy('/go_to_point_switch', SetBool)
 
     rate = rospy.Rate(20)
 
     while not rospy.is_shutdown():
-        if startStop_ and path_found_:
-            change_state(1)
-        else:
-            change_state(0)
+        if startStop_:
+            if not entry_found_:
+                change_state(0)
+            elif not a_star_:
+                change_state(1)
+            else:
+                change_state(2)
 
         rate.sleep()
 

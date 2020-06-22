@@ -9,10 +9,10 @@ from std_msgs.msg import Bool
 from std_srvs.srv import *
 from visualization_msgs.msg import Marker
 
-position_ = Point()
-active_ = False
 pub_cmd_vel_ = None
 pub_visualization_marker_ = None
+pub_entry_ = None
+
 regions_ = {
     'right': 0,
     'fright': 0,
@@ -22,6 +22,8 @@ regions_ = {
 }
 entry_found_ = 0
 startStop_ = False
+position_ = Point()
+active_ = False
 
 
 def find_the_entry_switch(req):
@@ -60,12 +62,13 @@ def clbk_drive(msg):
 
 
 def take_action():
-    global active_, regions_, entry_found_, position_
+    global active_, regions_, entry_found_, position_, pub_entry_
     regions = regions_
 
     if active_ and entry_found_ == 0:
         if regions['left'] < 1.2 or regions['right'] < 1.2:
             entry_found_ = 1
+            pub_entry_.publish(True)
             marker(int(position_.x.real), int(position_.y.real))
 
 
@@ -104,21 +107,20 @@ def marker(x, y):
 
 
 def main():
-    global pub_cmd_vel_, pub_visualization_marker_, active_
+    global pub_cmd_vel_, pub_visualization_marker_, pub_entry_
+    global active_
 
     rospy.init_node('find_the_entry')
 
-    pub_cmd_vel_ = rospy.Publisher('/cmd_vel', Twist, queue_size=1)
+    srv = rospy.Service('find_the_entry_switch', SetBool, find_the_entry_switch)
 
+    pub_cmd_vel_ = rospy.Publisher('/cmd_vel', Twist, queue_size=1)
     pub_visualization_marker_ = rospy.Publisher("/visualization_marker", Marker, queue_size=1)
+    pub_entry_ = rospy.Publisher('/entry', Bool, queue_size=1)
 
     sub_scan = rospy.Subscriber('/scan', LaserScan, clbk_laser)
-
     sub_odom = rospy.Subscriber('/odom', Odometry, clbk_odom)
-
     sub_drive = rospy.Subscriber('/start_stop', Bool, clbk_drive)
-
-    srv = rospy.Service('find_the_entry_switch', SetBool, find_the_entry_switch)
 
     rate = rospy.Rate(20)
     while not rospy.is_shutdown():
