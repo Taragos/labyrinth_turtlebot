@@ -3,27 +3,27 @@
 
   <!-- ALL ARGUMENTS-->
   <arg name="model" default="burger" doc="model type [burger, waffle, waffle_pi]"/>
-  <arg name="initial_x" default="2" />
-  <arg name="initial_y" default="0.5" />
+  <arg name="initial_x" default="11" />
+  <arg name="initial_y" default="8" />
   <arg name="initial_z" default="0" />
   <arg name="roll" default="0"/>
   <arg name="pitch" default="0"/>
   <arg name="yaw" default="3"/>
+  <arg name="direction" default="-1"/>
   <param name="initial_x" value="$(arg initial_x)" />
   <param name="initial_y" value="$(arg initial_y)" />
-  <param name="initial_z" value="$(arg initial_z)" />
-  <arg name="world" default="final.world" />
+  <param name="direction" value="$(arg direction)" />
+  <arg name="world" default="challenge_maze_double_entry.world" />
   <arg name="scan_topic"  default="/scan" />
   <arg name="base_frame"  default="base_footprint"/>
   <arg name="odom_frame"  default="odom"/>
-
   <!-- Export env variable so that gazebo finds the models and materials -->
   <env name="GAZEBO_MODEL_PATH" value="$(find labyrinth_turtlebot)/models" />
 
   <!-- ALL PARAMS-->
   <param name="robot_description" command="$(find xacro)/xacro --inorder '$(find turtlebot3_description)/urdf/turtlebot3_$(arg model).urdf.xacro'" />
 
-  <!-- We resume the logic in empty_world.launch, changing only the name of 
+  <!-- We resume the logic in empty_world.launch, changing only the name of
     the world to be launched -->
   <include file="$(find gazebo_ros)/launch/empty_world.launch">
     <arg name="world_name" value="$(find labyrinth_turtlebot)/worlds/$(arg world)" />
@@ -34,18 +34,24 @@
     <arg name="headless" value="false" />
   </include>
 
+
   <node pkg="gazebo_ros" type="spawn_model" name="spawn_urdf" args="-urdf -model turtlebot3_$(arg model) -x $(arg initial_x) -y $(arg initial_y) -z $(arg initial_z) -R $(arg roll) -P $(arg pitch) -Y $(arg yaw) -param robot_description" />
 
   <node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher">
     <param name="publish_frequency" type="double" value="50.0" />
   </node>
 
-  <node pkg="rviz" name="rviz" type="rviz" args="-d $(find labyrinth_turtlebot)/config/config.rviz"  />
+  <node pkg="rviz" name="rviz" type="rviz" args="-d $(find labyrinth_turtlebot)/config/rviz_config.rviz"  />
 
   <node pkg="labyrinth_turtlebot" name="start_stop_server" type="start_stop_server.py" />
+  <node pkg="labyrinth_turtlebot" name="in_lab_server" type="in_lab_server.py" />
   <node pkg="labyrinth_turtlebot" name="find_the_entry" type="find_the_entry.py"/>
-  <node pkg="labyrinth_turtlebot" name="follow_wall" type="follow_wall.py" output="screen"/>
-  <node pkg="labyrinth_turtlebot" name="coordinator" type="coordinator.py"/>
-  <!-- <node pkg="labyrinth_turtlebot" type="go_to_point.py" name="go_to_point"/> -->
+  <node pkg="labyrinth_turtlebot" name="follow_wall" type="follow_wall.py"/>
+  <node pkg="labyrinth_turtlebot" name="coordinator" type="coordinator.py" output="screen"/>
+  <node pkg="labyrinth_turtlebot" name="map_handler" type="map_handler.py" output="screen"/>
+  <node pkg="labyrinth_turtlebot" type="go_to_point.py" name="go_to_point"/>
+  <node pkg="slam_karto" type="slam_karto" name="slam_karto" output="screen">
+    <rosparam command="load" file="$(find labyrinth_turtlebot )/config/karto_mapper_params.yaml" />
+  </node>
 
 </launch>

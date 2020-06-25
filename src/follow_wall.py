@@ -3,13 +3,22 @@ import math
 
 import rospy
 from sensor_msgs.msg import LaserScan
-from geometry_msgs.msg import Twist, Point
+from geometry_msgs.msg import Twist
 from std_msgs.msg import Bool
 from std_srvs.srv import *
-from tf.transformations import euler_from_quaternion
 
-active_ = False
-pub_cmd_vel_ = None
+hz = 20  # Cycle Frequency
+inf = 3.5  # Limit to Laser sensor range in meters, all distances above this value are
+#                  considered out of sensor range
+wall_dist = 0.17  # Distance desired from the wall
+max_speed = 0.1  # Maximum speed of the robot on meters/seconds
+active_ = False  # active state
+entry_found_ = 0
+startStop_ = False
+direction = rospy.get_param("/direction")  # 1 for wall on the left side of the robot (-1 for the right side)
+wall_found = 0
+
+# Sensor regions
 regions_ = {
     'right': 0,
     'fright': 0,
@@ -17,40 +26,24 @@ regions_ = {
     'fleft': 0,
     'left': 0,
 }
-entry_found_ = 0
+
+# Robot state machines
 state_ = 0
 state_dict_ = {
     0: 'find the wall',
-    1: 'turn right',
-    2: 'turn left',
+    1: 'rotate outer corner',
+    2: 'rotate inner corner',
     3: 'follow the wall',
-    4: 'turn right on point',
-    5: 'turn left on point',
-    # 6: 'drive backwards',
 }
-startStop_ = False
 
-wall_found = 0
-wall_dist = 0.25
-max_speed = 0.2
-
-inf = 3.6
-
-orientation_ = Point()
-position_ = Point()
-roll = pitch = yaw = 0.0
-x = y = 0.0
-yaw_degree = 0.0
-desired_yaw = 0
-yaw_dict_ = {
-    0: 0,
-    1: 1.5,
-    2: 3,
-    3: -1.5,
-}
+# Publisher
+pub_cmd_vel_ = None
 
 
 def wall_follower_switch(req):
+    """
+    Switch active state of wall follower
+    """
     global active_
     active_ = req.data
     res = SetBoolResponse()
@@ -61,6 +54,11 @@ def wall_follower_switch(req):
 
 # callbacks
 def clbk_laser(msg):
+    """
+    Read sensor messages, and determine distance to each region.
+    Manipulates the values measured by the sensor.
+    Callback function for the subscription to the published Laser Scan values.
+    """
     global regions_, inf
     regions_ = {
         'left': min(min(msg.ranges[72:107]), inf),
@@ -70,20 +68,7 @@ def clbk_laser(msg):
         'right': min(min(msg.ranges[252:287]), inf),
     }
 
-    determine_direction_of_obstacle()
-
-
-def clbk_position(msg):
-    """
-    Callback for the /odom Topic
-    Get's the odometry data of the roboter and extracts valuable information
-    position_: Current world position of roboter
-    """
-    global orientation_, position_, roll, pitch, yaw, yaw_degree  # position_marker,
-    position_ = msg.pose.pose.position
-    orientation_ = msg.pose.pose.orientation
-    (roll, pitch, yaw) = euler_from_quaternion([orientation_.x, orientation_.y, orientation_.z, orientation_.w])
-    yaw_degree = (yaw * (180 / math.pi))
+    take_action()
 
 
 def clbk_drive(msg):
@@ -92,103 +77,90 @@ def clbk_drive(msg):
 
 
 def change_state(state):
+    """
+    Update machine state
+    """
     global state_, state_dict_
     if state is not state_:
         rospy.loginfo('Wall follower - [%s] - %s' % (state, state_dict_[state]))
         state_ = state
 
 
-def determine_direction_of_obstacle():
+def take_action():
     """
-    Checks the Regions and determines in which regions are obstacles  
-    Checks against a variable: wall_dist, that set's the maximum distance to the obstacle
+    Change state for the machine states in accordance with the active and inactive regions of the sensor.
+            State 0 No wall found - all regions infinite - Random Wandering
+            State 1 Outer corner found - Rotating
+            State 2 Inner corner found - Rotating
+            State 3 Wall found - Following Wall
     """
-    global regions_, entry_found_, wall_dist, wall_found
+    global regions_, entry_found_, direction, wall_dist, wall_found
     regions = regions_
     state_description = ''
-
-    # rospy.loginfo("---------------------------")
-    # rospy.loginfo("Deadend: " + str(is_deadend()))
-    # rospy.loginfo("Outer Corner: " + str(is_outer_corner()))
-    # rospy.loginfo("Inner Corner: " + str(is_inner_corner()))
-    # rospy.loginfo("---------------------------")
-    #
-    # rospy.loginfo("---------------------------")
-    # rospy.loginfo("Left: " + str(wall_left()))
-    # rospy.loginfo("FLeft: " + str(wall_fleft()))
-    # rospy.loginfo("Front: " + str(wall_front()))
-    # rospy.loginfo("FRight: " + str(wall_fright()))
-    # rospy.loginfo("Right: " + str(wall_right()))
-    # rospy.loginfo("---------------------------")
-
-    # rospy.loginfo("---------------------------")
-    # rospy.loginfo("Left: " + str(regions_['left']))
-    # rospy.loginfo("Left: " + str(regions_['fleft']))
-    # rospy.loginfo("Front: " + str(regions_['front']))
-    # rospy.loginfo("Right: " + str(regions_['fright']))
-    # rospy.loginfo("Right: " + str(regions_['right']))
-    # rospy.loginfo("---------------------------")
 
     if wall_found == 0:
         change_state(0)
     else:
-        # 0: 'find the wall', 1: 'turn left', 2: 'turn right', 3: 'follow the wall', 4: 'turn right on point',
-        # 5: 'turn left on point',
-
-        if is_inner_corner():
-            change_state(5)
-        elif wall_front() and wall_fleft() and not wall_fright():
-            change_state(4)
-        elif wall_fright():
-            change_state(1)
-        elif not wall_fright() and not wall_right():
-            change_state(2)
-        elif wall_front():
-            change_state(5)
+        if direction == -1:
+            if regions['front'] > wall_dist and regions['fright'] > wall_dist:
+                state_description = 'case 1 - nothing'
+                change_state(1)
+            elif regions['front'] < wall_dist < regions['fright']:
+                state_description = 'case 2 - front'
+                change_state(2)
+            elif regions['front'] > wall_dist > regions['fright']:
+                state_description = 'case 3 - fright'
+                change_state(3)
+            elif regions['front'] > wall_dist and regions['fright'] > wall_dist:
+                state_description = 'case 4 - fleft'
+                change_state(1)
+            elif regions['front'] < wall_dist and regions['fright'] < wall_dist:
+                state_description = 'case 5 - front and fright'
+                change_state(2)
+            elif regions['front'] < wall_dist and regions['fleft'] < wall_dist:
+                state_description = 'case 6 - front and fleft'
+                change_state(2)
+            elif regions['front'] < wall_dist and regions['fright'] < wall_dist:
+                state_description = 'case 7 - front and fleft and fright'
+                change_state(2)
+            elif regions['front'] > wall_dist > regions['fright']:
+                state_description = 'case 8 - fleft and fright'
+                change_state(2)
+            else:
+                state_description = 'unknown case'
+                rospy.loginfo(regions)
         else:
-            rospy.loginfo("Unknown state")
-
-
-def wall_left():
-    return regions_['left'] < wall_dist
-
-
-def wall_fleft():
-    return regions_['fleft'] < wall_dist
-
-
-def wall_front():
-    return regions_['front'] < wall_dist
-
-
-def wall_fright():
-    return regions_['fright'] < wall_dist
-
-
-def wall_right():
-    return regions_['right'] < wall_dist
-
-
-def is_deadend():
-    return wall_fleft() and wall_fright() and wall_front()
-
-
-def is_inner_corner():
-    return wall_fright() and wall_front() #  and not wall_left()
-
-
-def is_outer_corner():
-    return wall_right() and not wall_fright()
-
-
-def is_wall_front():
-    return (wall_fleft() or wall_front() or wall_fright()) and not wall_left() and not wall_right()
+            if regions['front'] > wall_dist and regions['fleft'] > wall_dist:
+                state_description = 'case 1 - nothing'
+                change_state(1)
+            elif regions['front'] < wall_dist < regions['fleft']:
+                state_description = 'case 2 - front'
+                change_state(2)
+            elif regions['front'] > wall_dist and regions['fleft'] > wall_dist:
+                state_description = 'case 3 - fright'
+                change_state(1)
+            elif regions['front'] > wall_dist > regions['fleft']:
+                state_description = 'case 4 - fleft'
+                change_state(3)
+            elif regions['front'] < wall_dist < regions['fleft']:
+                state_description = 'case 5 - front and fright'
+                change_state(1)
+            elif regions['front'] < wall_dist and regions['fleft'] < wall_dist:
+                state_description = 'case 6 - front and fleft'
+                change_state(2)
+            elif regions['front'] < wall_dist and regions['fleft'] < wall_dist:
+                state_description = 'case 7 - front and fleft and fright'
+                change_state(2)
+            elif regions['front'] > wall_dist > regions['fleft']:
+                state_description = 'case 8 - fleft and fright'
+                change_state(2)
+            else:
+                state_description = 'unknown case'
+                rospy.loginfo(regions)
+    rospy.loginfo(state_description)
 
 
 def find_wall():
-    """
-    Generates a Twist Message, that let's the robot turn right
-    """
     global regions_, max_speed, wall_found
     regions = regions_
     msg = Twist()
@@ -198,88 +170,63 @@ def find_wall():
         msg.angular.z = 0
     else:
         msg.linear.x = max_speed
-        msg.angular.z = 0.1
+        msg.angular.z = direction * 0.3
     return msg
 
 
-def turn_left():
+def rotate_inner_corner():
     """
-    Generates a Twist Message, that let's the robot turn left
+    Rotation movement of the robot.
+    Returns:
+            Twist(): msg with angular and linear velocities to be published
+                    msg.linear.x -> 0m/s
+                    msg.angular.z -> -2 or +2 rad/s
     """
-    msg = Twist()
-    msg.linear.x = max_speed
-    msg.angular.z = 0.1
-    return msg
-
-
-def turn_left_on_point():
-    """
-    Generates a Twist Message, that let's the robot turn left on spot
-    """
+    global direction
     msg = Twist()
     msg.linear.x = 0
-    msg.angular.z = 0.5
+    msg.angular.z = direction * -0.2
     return msg
 
 
-def turn_right():
+def rotate_outer_corner():
     """
-    Generates a Twist Message, that let's the robot turn right
+    Rotation movement of the robot.
+    Returns:
+            Twist(): msg with angular and linear velocities to be published
+                    msg.linear.x -> 0m/s
+                    msg.angular.z -> -2 or +2 rad/s
     """
-    msg = Twist()
-    msg.linear.x = max_speed/4
-    msg.angular.z = -0.1
-    return msg
-
-
-def turn_right_on_point():
-    """
-    Generates a Twist Message, that let's the robot turn right on spot
-    """
+    global direction
     msg = Twist()
     msg.linear.x = 0
-    msg.angular.z = -0.5
+    msg.angular.z = direction * 0.2
     return msg
 
 
 def follow_the_wall():
-    """
-    Generates a Twist Message, that let's the robot drive forward
-    """
     global max_speed
-
     msg = Twist()
-    msg.linear.x = max_speed/4
+    msg.linear.x = max_speed
     msg.angular.z = 0
     return msg
 
 
-# def drive_backwards():
-#     """
-#     Generates a Twist Message, that let's the robot drive backwards
-#     """
-#     global max_speed
-#
-#     msg = Twist()
-#     msg.linear.x = -max_speed/4
-#     msg.angular.z = -0.1
-#     return msg
-
-
 def main():
-    global pub_cmd_vel_, active_
+    global pub_cmd_vel_, active_, hz
 
     rospy.init_node('follow_wall')
+
+    srv = rospy.Service('wall_follower_switch', SetBool, wall_follower_switch)
 
     pub_cmd_vel_ = rospy.Publisher('/cmd_vel', Twist, queue_size=1)
 
     sub_scan = rospy.Subscriber('/scan', LaserScan, clbk_laser)
-
     sub_drive = rospy.Subscriber('/start_stop', Bool, clbk_drive)
 
-    srv = rospy.Service('wall_follower_switch', SetBool, wall_follower_switch)
+    change_state(0)
 
-    rate = rospy.Rate(20)
+    rate = rospy.Rate(hz)
     while not rospy.is_shutdown():
 
         msg = Twist()
@@ -291,16 +238,11 @@ def main():
         if state_ == 0:
             msg = find_wall()
         elif state_ == 1:
-            msg = turn_right()
+            msg = rotate_outer_corner()
         elif state_ == 2:
-            msg = turn_left()
+            msg = rotate_inner_corner()
         elif state_ == 3:
             msg = follow_the_wall()
-        elif state_ == 4:
-            msg = turn_right_on_point()
-        elif state_ == 5:
-            msg = turn_left_on_point()
-            pass
         else:
             rospy.logerr('Unknown state!')
 
