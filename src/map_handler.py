@@ -10,22 +10,26 @@ from rospy import Time
 import math
 import time
 
-
-
 pub_visualization_marker_ = pub_path_ = None
-map_origin_ = position_ = Point()
-resolution_ = 0.5  # resolution in m per square -> 0.05 ~ one square = 5cm
-height_ = width_ = 0.0
+
+vis_counter_ = 0
+vis_debug_counter_ = 0
+
+map_origin_ = Point()
+map_resolution_ = 0.5  # resolution in m per square -> 0.05 ~ one square = 5cm
+map_height_ = map_width_ = 0.0
 map_data_ = []
-markers_ = []
-a_star_vis = MarkerArray()
+
 turtlebot_radius_ = 11  # radius of turtlebot = 105mm in cm ~ 11cm
-last_wall_ = 0
-check_positions_ = []
-last_wall_direction = 0
-map_update_frequency_ = 2 # e.g. = 2 -> every second map update, update the path
-map_update_counter_ = 0
-bad_map_ = {}
+turtlebot_position_ = Point()
+
+wall_check_positions_ = []
+wall_last_direction_ = 0
+
+path_update_frequency_ = 2 # e.g. = 2 -> every second map update, update the path
+path_update_counter_ = 0
+path_bad_squares_ = {}
+path_good_squares = {}
 
 class Node():
     """
@@ -41,6 +45,13 @@ class Node():
 
     def __eq__(self, other):
         return self.position[0] == other.position[0] and self.position[1] == other.position[1]
+    
+    def __repr__(self):
+        return "(" + str(self.position[0]) + "," + str(self.position[1]) + ")"
+    def __str__(self):
+        return "(" + str(self.position[0]) + "," + str(self.position[1]) + ")"
+    def __unicode__(self):
+        return u("(" + str(self.position[0]) + "," + str(self.position[1]) + ")")
 
 # ----------------------------------------------> y
 # |                          (-1,0)
@@ -53,40 +64,40 @@ class Node():
 # V                             V
 # x                          (1, 0)
 def setup_wall_distance():
-    global check_positions_
-    min_dist_in_squares = int(math.ceil(turtlebot_radius_ / (resolution_ * 100))) + 1
+    global wall_check_positions_
+    min_dist_in_squares = int(math.ceil(turtlebot_radius_ / (map_resolution_ * 100)))
     # Rechts                                                                 
     for i in range(1, min_dist_in_squares):                                  
-        check_positions_.append((0, i))                                      
+        wall_check_positions_.append((0, i))                                      
     # Unten Rechts
     for i in range(1, min_dist_in_squares):                                  
-        check_positions_.append((i, i)) # rechts unten
+        wall_check_positions_.append((i, i)) # rechts unten
     # Runter                                                                 
     for i in range(1, min_dist_in_squares):                                  
-        check_positions_.append((i, 0))
+        wall_check_positions_.append((i, 0))
     # Unten Links
     for i in range(1, min_dist_in_squares):                                  
-        check_positions_.append((i, -i))                                        
+        wall_check_positions_.append((i, -i))                                        
     # Links                                                                  
     for i in range(1, min_dist_in_squares):                                  
-        check_positions_.append((0, -i))                                     
+        wall_check_positions_.append((0, -i))                                     
     # Oben Links
     for i in range(1, min_dist_in_squares):                                  
-        check_positions_.append((-i, -i))   
+        wall_check_positions_.append((-i, -i))   
     # Hoch                                                                   
     for i in range(1, min_dist_in_squares):
-        check_positions_.append((-i, 0))
+        wall_check_positions_.append((-i, 0))
     # Oben Rechts
     for i in range(1, min_dist_in_squares):                                  
-        check_positions_.append((-i, i))       
+        wall_check_positions_.append((-i, i))       
 
 # checks if there is a wall somewhere close to the current node, that the turtlebot might bump into
 def check_for_wall(current_position, maze):
-    global last_wall_direction
+    global wall_last_direction_
     run = True
-    start_index = last_wall_direction
+    start_index = wall_last_direction_
     while run:
-        new_position = check_positions_[last_wall_direction]
+        new_position = wall_check_positions_[wall_last_direction_]
         node_position = (current_position[0] + new_position[0], current_position[1] + new_position[1])
 
         if node_position[0] < 0 or node_position[1] < 0:
@@ -101,20 +112,34 @@ def check_for_wall(current_position, maze):
         if maze[index] == 100:
             return True
 
-        last_wall_direction = (last_wall_direction + 1) % len(check_positions_)
-        if start_index is last_wall_direction:
+        wall_last_direction_ = (wall_last_direction_ + 1) % len(wall_check_positions_)
+        if start_index is wall_last_direction_:
             run = False
     return False
 
-
 def add_to_bad_map(x_i, y_i):
-    global bad_map_
+    global path_bad_squares_
 
-    bad_map_[x_i] = y_i
+    if x_i in path_bad_squares_.keys():
+        path_bad_squares_[x_i].append(y_i) 
+    else:
+        new_list = [y_i]
+        path_bad_squares_[x_i] = new_list
+
+def add_to_good_map(x_i, y_i):
+    global path_good_squares_
+
+    if x_i in path_good_squares.keys():
+        path_good_squares[x_i].append(y_i) 
+    else:
+        new_list = [y_i]
+        path_good_squares[x_i] = new_list
 
 def astar(maze, start, end):
+    global path_bad_squares_
     """Returns a list of tuples as a path from the given start to the given end in the given maze"""
     # Create start and end node
+
     start_node = Node(None, start)
     start_node.g = start_node.h = start_node.f = 0
     end_node = Node(None, end)
@@ -123,13 +148,14 @@ def astar(maze, start, end):
     # Initialize both open and closed list
     open_list = []
     closed_list = []
+    path_bad_squares_ = {}
 
     # Add the start node
     open_list.append(start_node)
 
     # Loop until you find the end
     while len(open_list) > 0:
-
+        debug_squares()
         # Get the current node
         current_node = open_list[0]
         current_index = 0
@@ -142,7 +168,6 @@ def astar(maze, start, end):
         open_list.pop(current_index)
         closed_list.append(current_node)
         rospy.loginfo("Current Node Pos: %s " % (current_node.position,))
-
         # Found the goal
         if current_node == end_node:
             path = []
@@ -159,87 +184,96 @@ def astar(maze, start, end):
             # Get node position
             node_position = (current_node.position[0] + new_position[0], current_node.position[1] + new_position[1])
 
-            if node_position[0] < 0 or node_position[1] < 0:
-                continue
+            # Just don't give a fuck about being within bounds
+            # if node_position[0] < 0 or node_position[1] < 0:
+                # continue
 
-            rospy.loginfo("Child Node Pos: %s " % (node_position,))
             
-            if node_position[0] in bad_map_.keys() and bad_map_[node_position[0]] == node_position[1]:
+            if node_position[0] in path_bad_squares_.keys() and node_position[1] in path_bad_squares_[node_position[0]]:
                 continue
 
             # Make sure within range
             index = get_index(node_position[0], node_position[1])
             rospy.loginfo("Child Index: %s " % str(index))
-            if index < 0 or index >= len(maze):
-                add_to_bad_map(node_position[0], node_position[1])
-                continue
+            if index >= 0 and index < len(maze):
+                # add_to_bad_map(node_position[0], node_position[1])
+                # continue
 
-            # Make sure walkable terrain
-            if maze[index] == 100:
-                # add_red_marker(node_position[0], node_position[1], index)
-                add_to_bad_map(node_position[0], node_position[1])
-                continue
+                # Make sure walkable terrain
+                if maze[index] == 100:
+                    # add_red_marker(node_position[0], node_position[1], index)
+                    add_to_bad_map(node_position[0], node_position[1])
+                    continue
 
-            if check_for_wall(node_position, maze):
-                add_to_bad_map(node_position[0], node_position[1])
-                continue
-
+                if check_for_wall(node_position, maze):
+                    add_to_bad_map(node_position[0], node_position[1])
+                    continue
+            if node_position[0] < 0 or node_position[1] < 0:
+                rospy.loginfo("Child Node Pos: %s " % (node_position,))
+                    
             # Create new node
             new_node = Node(current_node, node_position)
 
             # Append
             children.append(new_node)
 
-        rospy.loginfo("Children: %s" % children)
         # Loop through children
         for child in children:
 
             # Child is on the closed list
             if child in closed_list:
-                rospy.loginfo("Child: %s" % (child.position,))
+                # rospy.loginfo("Child: %s" % (child.position,))
                 continue
 
+
+            # rospy.loginfo("Gone further with: %s" % (child.position,))
             # Create the f, g, and h values
             child.g = current_node.g + 1
             child.h = ((child.position[0] - end_node.position[0]) ** 2) + (
                         (child.position[1] - end_node.position[1]) ** 2)
             child.f = child.g + child.h
-
+            add_to_good_map(child.position[0], child.position[1])
+            
+            ignore = False
             # Child is already in the open list
             for open_node in open_list:
-                if child == open_node and child.g > open_node.g:
-                    continue
-
+                if child == open_node:
+                    if child.g >= open_node.g:
+                        ignore = True
+                    else:
+                        open_list.remove(open_node)
+            if ignore:            
+                continue
+                    
             # Add the child to the open list
             open_list.append(child)
 
 # callbacks
 def clbk_odom(msg):
-    global position_
+    global turtlebot_position_
 
     # position
-    position_ = msg.pose.pose.position
-
+    turtlebot_position_ = msg.pose.pose.position
 
 def clbk_map(msg):
-    global map_origin_, resolution_, height_, width_, map_data_, map_update_counter_
+    global map_origin_, map_resolution_, map_height_, map_width_, map_data_, path_update_counter_
 
     # Sets Global Variables
     map_origin_ = Point(
         msg.info.origin.position.x,
         msg.info.origin.position.y,
         0)
-    resolution_ = msg.info.resolution
-    height_ = msg.info.height
-    width_ = msg.info.width
+    map_resolution_ = msg.info.resolution
+    map_height_ = msg.info.height
+    map_width_ = msg.info.width
     map_data_ = msg.data
 
-    if len(check_positions_) == 0:
+    if len(wall_check_positions_) == 0:
         setup_wall_distance()
 
-    if (map_update_counter_ % map_update_frequency_) == 0:
+    if (path_update_counter_ % path_update_frequency_) == 0:
         # Get Square closest to TurtleBot Position
-        x_i, y_i = get_closest_square(position_.x, position_.y)
+        x_i, y_i = get_closest_square(turtlebot_position_.x, turtlebot_position_.y)
 
         rospy.loginfo("X_I: " + str(x_i) + ", Y_I: " + str(y_i))
 
@@ -254,41 +288,107 @@ def clbk_map(msg):
 
         publish_path(path)
 
-    map_update_counter_ = map_update_counter_ + 1
+    path_update_counter_ = path_update_counter_ + 1
+
+def debug_squares():
+    global vis_debug_counter_
+    path = MarkerArray()
+
+    counter = 0
+
+    for key, values in path_good_squares.items():
+        for value in values:
+            x, y = map_indices_to_position(key, value)
+            add_square_marker(path, counter, x, y, (0,1,0))
+            counter = counter + 1
+
+
+    for key, values in path_bad_squares_.items():
+        for value in values:
+            x, y = map_indices_to_position(key, value)
+            add_square_marker(path, counter, x, y, (1,0,0))
+            counter = counter + 1
+
+
+    while counter <= vis_debug_counter_:
+        add_empty_marker(path, counter)
+        counter = counter + 1
+
+    vis_debug_counter_ = counter
+    pub_path_.publish(path)
 
 def publish_path(data):
+    global vis_counter_
     path = MarkerArray()
+
     counter = 0
 
     for tuple in data:
         x, y = map_indices_to_position(tuple[0], tuple[1])
-
-        marker = Marker()
-        marker.header.frame_id = "odom"
-        marker.header.stamp = Time()
-        marker.ns = "labyrinth_turtlebot"
-        marker.id = counter
-        marker.type = Marker.CUBE
-        marker.action = Marker.ADD
-        marker.pose.position.x = x + (resolution_ / 2)
-        marker.pose.position.y = y + (resolution_ / 2)
-        marker.pose.position.z = 0
-        marker.pose.orientation.x = 0.0
-        marker.pose.orientation.y = 0.0
-        marker.pose.orientation.z = 0.0
-        marker.pose.orientation.w = 1.0
-        marker.scale.x = resolution_
-        marker.scale.y = resolution_
-        marker.scale.z = 0.01
-        marker.color.a = 0.5
-        marker.color.r = 1.0
-        marker.color.g = 1.0
-        marker.color.b = 0.0
+        add_square_marker(path, counter, x, y, (1, 1, 0))
         counter = counter + 1
-        path.markers.append(marker)
 
+    for key, values in path_bad_squares_.items():
+        for value in values:
+            x, y = map_indices_to_position(key, value)
+            add_square_marker(path, counter, x, y, (1,0,0))
+            counter = counter + 1
+
+
+    while counter <= vis_counter_:
+        add_empty_marker(path, counter)
+        counter = counter + 1
+
+    vis_counter_ = counter
     pub_path_.publish(path)
 
+def add_square_marker(path, counter, x, y, color):
+    marker = Marker()
+    marker.header.frame_id = "odom"
+    marker.header.stamp = Time()
+    marker.ns = "labyrinth_turtlebot"
+    marker.id = counter
+    marker.type = Marker.CUBE
+    marker.action = Marker.ADD
+    marker.pose.position.x = x + (map_resolution_ / 2)
+    marker.pose.position.y = y + (map_resolution_ / 2)
+    marker.pose.position.z = 0
+    marker.pose.orientation.x = 0.0
+    marker.pose.orientation.y = 0.0
+    marker.pose.orientation.z = 0.0
+    marker.pose.orientation.w = 1.0
+    marker.scale.x = map_resolution_
+    marker.scale.y = map_resolution_
+    marker.scale.z = 0.01
+    marker.color.a = 0.5
+    marker.color.r = color[0]
+    marker.color.g = color[1]
+    marker.color.b = color[2]
+    path.markers.append(marker)
+
+def add_empty_marker(path, counter):
+    marker = Marker()
+    marker.header.frame_id = "odom"
+    marker.header.stamp = Time()
+    marker.ns = "labyrinth_turtlebot"
+    marker.id = counter
+    marker.type = Marker.CUBE
+    marker.action = Marker.ADD
+    marker.pose.position.x = 0
+    marker.pose.position.y = 0
+    marker.pose.position.z = 0
+    marker.pose.orientation.x = 0.0
+    marker.pose.orientation.y = 0.0
+    marker.pose.orientation.z = 0.0
+    marker.pose.orientation.w = 1.0
+    marker.scale.x = map_resolution_
+    marker.scale.y = map_resolution_
+    marker.scale.z = 0.01
+    marker.color.a = 1.0
+    marker.color.r = 0.0
+    marker.color.g = 0.0
+    marker.color.b = 0.0
+    path.markers.append(marker)
 
 def map_indices_to_position(x_i, y_i):
     """Converts the given map indices to the real world x and y positions 
@@ -301,20 +401,19 @@ def map_indices_to_position(x_i, y_i):
     x (int): X Position in real world\n
     y (int): Y Position in real world
     """
-    x = x_i * resolution_ + map_origin_.x
-    y = y_i * resolution_ + map_origin_.y
+    x = x_i * map_resolution_ + map_origin_.x
+    y = y_i * map_resolution_ + map_origin_.y
     return x, y
 
-
 def get_closest_occupied_square(x_i, y_i):
-    global map_origin_, resolution_, height_, width_
+    global map_origin_, map_resolution_, map_height_, map_width_
     level = 0
     start_x, start_y = x_i, y_i
-    # x = start_x * resolution_ + map_origin_.x        
-    # y = start_y * resolution_ + map_origin_.y    
+    # x = start_x * map_resolution_ + map_origin_.x        
+    # y = start_y * map_resolution_ + map_origin_.y    
     # marker_closest_square(x, y)
 
-    while (start_x + level) < width_ * 2 and (start_y + level) < height_ * 2:
+    while (start_x + level) < map_width_ * 2 and (start_y + level) < map_height_ * 2:
         # 1 Up
         x_i = x_i - 1
         rospy.loginfo("Up Move: X_I: " + str(x_i) + ", Y_I: " + str(y_i))
@@ -359,18 +458,15 @@ def is_occupied(x_i, y_i):
     else:
         return False  # return False, so it doesn't get used
 
-
 def get_index(x_i, y_i):
-    return int(y_i * width_ + x_i)  # calculate index of square in data array
-
+    return int(y_i * map_width_ + x_i)  # calculate index of square in data array
 
 def get_closest_square(x, y):
     x_delta = x - map_origin_.x
     y_delta = y - map_origin_.y
-    x_i = x_delta // resolution_
-    y_i = y_delta // resolution_
+    x_i = x_delta // map_resolution_
+    y_i = y_delta // map_resolution_
     return x_i, y_i
-
 
 def marker_map_origin(x, y):
     global pub_visualization_marker_
@@ -399,7 +495,6 @@ def marker_map_origin(x, y):
     marker.color.b = 0.0
     pub_visualization_marker_.publish(marker)
 
-
 def marker_closest_square(x, y):
     global pub_visualization_marker_
 
@@ -427,7 +522,6 @@ def marker_closest_square(x, y):
     marker.color.b = 0.0
     pub_visualization_marker_.publish(marker)
 
-
 def coordinator():
     global pub_visualization_marker_, pub_path_
 
@@ -442,7 +536,6 @@ def coordinator():
 
     while not rospy.is_shutdown():
         rate.sleep()
-
 
 if __name__ == '__main__':
     try:

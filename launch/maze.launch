@@ -11,7 +11,7 @@
   <arg name="yaw" default="3"/>
   <param name="initial_x" value="$(arg initial_x)" />
   <param name="initial_y" value="$(arg initial_y)" />
-  <arg name="world" default="challenge_maze_double_entry.world" />
+  <arg name="world" default="final.world" />
   <arg name="scan_topic"  default="/scan" />
   <arg name="base_frame"  default="base_footprint"/>
   <arg name="odom_frame"  default="odom"/>
@@ -33,8 +33,8 @@
     <arg name="headless" value="false" />
   </include>
 
-
-  <node pkg="gazebo_ros" type="spawn_model" name="spawn_urdf" args="-urdf -model turtlebot3_$(arg model) -x $(arg initial_x) -y $(arg initial_y) -z $(arg initial_z) -R $(arg roll) -P $(arg pitch) -Y $(arg yaw) -param robot_description" />
+<!-- -x $(arg initial_x) -y $(arg initial_y) -z $(arg initial_z) -R $(arg roll) -P $(arg pitch) -Y $(arg yaw) -->
+  <node pkg="gazebo_ros" type="spawn_model" name="spawn_urdf" args="-urdf -model turtlebot3_$(arg model)  -param robot_description" />
 
   <node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher">
     <param name="publish_frequency" type="double" value="50.0" />
