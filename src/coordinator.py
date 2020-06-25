@@ -64,7 +64,7 @@ def change_state(state):
         resp = srv_client_wall_follower_(True)
 
 
-def position(msg):
+def clbk_position(msg):
     """
     Callback for the /odom Topic  
     Get's the odometry data of the roboter and extracts valuable information  
@@ -79,8 +79,8 @@ def position(msg):
 def coordinator():
     rospy.init_node('coordinator')
 
-    init_subscribers()
     init_services()
+    init_subscribers()
     rate = rospy.Rate(20)
 
     while not rospy.is_shutdown():
@@ -100,11 +100,23 @@ def coordinator():
         rate.sleep()
 
 def init_subscribers():
+    """
+    Initializes Subscribers:  
+    sub_laser: Subscribes to /scan and executes clbk_laser  
+    sub_drive: Subscribes to /start_stop and executes clbk_drive
+    sub_odom: Subscribes to /odom and executes clbk_position
+    """
     sub_laser = rospy.Subscriber('/scan', LaserScan, clbk_laser)
     sub_drive = rospy.Subscriber('/start_stop', Bool, clbk_drive)
-    sub_odom = rospy.Subscriber('/odom', Odometry, position)
+    sub_odom = rospy.Subscriber('/odom', Odometry, clbk_position)
 
 def init_services():
+    """
+    Initializes connection to services:
+    /find_the_entry_switch:  
+    /wall_follower_switch:  
+    /starts_stop: Used in /sub_drive for the clbk_drive callback  
+    """
     global srv_client_find_the_entry_, srv_client_wall_follower_
 
     rospy.wait_for_service('/find_the_entry_switch')
