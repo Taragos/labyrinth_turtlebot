@@ -4,7 +4,7 @@
   <!-- ALL ARGUMENTS-->
   <arg name="model" default="burger" doc="model type [burger, waffle, waffle_pi]"/>
   <arg name="initial_x" default="2" />
-  <arg name="initial_y" default="1.1" />
+  <arg name="initial_y" default="0.5" />
   <arg name="initial_z" default="0" />
   <arg name="roll" default="0"/>
   <arg name="pitch" default="0"/>
