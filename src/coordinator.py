@@ -108,11 +108,11 @@ def handle_marker_req(req):
             x = position_.x - (10 * math.cos(180 - yaw_degree))
             y = position_.y + (10 * math.sin(180 - yaw_degree))
         elif 180 < yaw_degree < 270:
-            -x = position_.x - (10 * math.cos(180 - abs(yaw_degree)))
-            -y = position_.y + (10 * math.sin(180 - abs(yaw_degree)))
+            x = position_.x - (10 * math.cos(180 - abs(yaw_degree)))
+            y = position_.y + (10 * math.sin(180 - abs(yaw_degree)))
         else:
-            -x = position_.x + (10 * math.cos(abs(yaw_degree)))
-            -y = position_.y + (10 * math.sin(abs(yaw_degree)))
+            x = position_.x + (10 * math.cos(abs(yaw_degree)))
+            y = position_.y + (10 * math.sin(abs(yaw_degree)))
 
         marker(x, y)
         rospy.loginfo("Set new Marker")
