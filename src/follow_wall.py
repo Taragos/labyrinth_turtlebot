@@ -116,7 +116,7 @@ def take_action():
             elif regions['front'] > wall_dist > regions['fright']:
                 state_description = 'case 3 - fright'
                 change_state(3)
-            elif regions['front'] > wall_dist and regions['fright'] > wall_dist:
+            elif regions['front'] > wall_dist > regions['fleft'] and regions['fright'] > wall_dist:
                 state_description = 'case 4 - fleft'
                 change_state(1)
             elif regions['front'] < wall_dist and regions['fright'] < wall_dist:
@@ -141,7 +141,7 @@ def take_action():
             elif regions['front'] < wall_dist < regions['fleft']:
                 state_description = 'case 2 - front'
                 change_state(2)
-            elif regions['front'] > wall_dist and regions['fleft'] > wall_dist:
+            elif regions['front'] > wall_dist > regions['fright'] and regions['fleft'] > wall_dist:
                 state_description = 'case 3 - fright'
                 change_state(1)
             elif regions['front'] > wall_dist > regions['fleft']:
@@ -221,7 +221,7 @@ def follow_the_wall():
 
 
 def main():
-    global pub_cmd_vel_, active_, hz
+    global pub_cmd_vel_, active_, hz, state_
 
     rospy.init_node('follow_wall')
 

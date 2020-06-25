@@ -182,7 +182,9 @@ def main():
 def init_publisher():
     """
     Initializes Publisher:
-    pub_path_change: Publishes to /path_change and executes clbk_laser
+    pub_cmd_vel_: Publishes to /cmd_vel
+    pub_visualization_marker_entries_: Publishes to /visualization_marker_array
+    pub_entry_: Publishes to /entry
     """
     global pub_cmd_vel_, pub_visualization_marker_entries_, pub_entry_
     pub_cmd_vel_ = rospy.Publisher('/cmd_vel', Twist, queue_size=1)

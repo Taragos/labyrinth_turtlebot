@@ -9,7 +9,7 @@
   <arg name="roll" default="0"/>
   <arg name="pitch" default="0"/>
   <arg name="yaw" default="3"/>
-  <arg name="direction" default="1"/>
+  <arg name="direction" default="-1"/>
   <param name="initial_x" value="$(arg initial_x)" />
   <param name="initial_y" value="$(arg initial_y)" />
   <param name="direction" value="$(arg direction)" />
@@ -33,7 +33,6 @@
     <arg name="use_sim_time" value="true" />
     <arg name="headless" value="false" />
   </include>
-
 
   <node pkg="gazebo_ros" type="spawn_model" name="spawn_urdf" args="-urdf -model turtlebot3_$(arg model) -x $(arg initial_x) -y $(arg initial_y) -z $(arg initial_z) -R $(arg roll) -P $(arg pitch) -Y $(arg yaw) -param robot_description" />
 

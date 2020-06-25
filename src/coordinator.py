@@ -173,9 +173,11 @@ def init_subscribers():
     Initializes Subscribers:
     sub_drive: Subscribes to /start_stop and executes clbk_drive
     sub_odom: Subscribes to /odom and executes clbk_position
+    sub_entry: Subscribes to /entry and executes clbk_entry
     """
     sub_drive = rospy.Subscriber('/start_stop', Bool, clbk_drive)
     sub_odom = rospy.Subscriber('/odom', Odometry, clbk_position)
+    sub_entry = rospy.Subscriber('/entry', Bool, clbk_entry)
 
 
 def init_services():
@@ -183,14 +185,16 @@ def init_services():
     Initializes connection to services:
     /find_the_entry_switch:
     /wall_follower_switch:
-    /starts_stop: Used in /sub_drive for the clbk_drive callback
+    /go_to_point_switch:
     """
-    global srv_client_find_the_entry_, srv_client_wall_follower_
+    global srv_client_find_the_entry_, srv_client_go_to_point_, srv_client_wall_follower_
 
     rospy.wait_for_service('/find_the_entry_switch')
     rospy.wait_for_service('/wall_follower_switch')
+    rospy.wait_for_service('/go_to_point_switch')
 
     srv_client_find_the_entry_ = rospy.ServiceProxy('/find_the_entry_switch', SetBool)
+    srv_client_go_to_point_ = rospy.ServiceProxy('/go_to_point_switch', SetBool)
     srv_client_wall_follower_ = rospy.ServiceProxy('/wall_follower_switch', SetBool)
 
 

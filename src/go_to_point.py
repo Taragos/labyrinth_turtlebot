@@ -10,9 +10,6 @@ from std_srvs.srv import *
 
 import math
 
-active_ = False
-corner_count_ = 0
-
 # robot state variables
 position_ = Point()
 yaw_ = 0
@@ -24,6 +21,9 @@ desired_position_.z = 0
 # parameters
 yaw_precision_ = math.pi / 90  # +/- 2 degree allowed
 dist_precision_ = 0.3
+active_ = False
+startStop_ = False
+corner_count_ = 0
 
 # publishers
 pub_cmd_ = None
@@ -37,6 +37,15 @@ def go_to_point_switch(req):
     res.success = True
     res.message = 'Done!'
     return res
+
+
+def clbk_drive(msg):
+    """
+    Callback for the /start_stop service topic
+    Starts/Pauses the roboters activities based on the given Value{True, False}
+    """
+    global startStop_
+    startStop_ = msg.data
 
 
 # callbacks
@@ -135,28 +144,19 @@ def set_destination():
         change_state(0)
 
 
-# def done():
-#     twist_msg = Twist()
-#     twist_msg.linear.x = 0
-#     twist_msg.angular.z = 0
-#     pub_cmd_.publish(twist_msg)
-
-
 def main():
-    global pub_cmd_, active_
+    global active_
 
     rospy.init_node('go_to_point')
 
-    pub_cmd_ = rospy.Publisher('/cmd_vel', Twist, queue_size=1)
-
-    sub_odom = rospy.Subscriber('/odom', Odometry, clbk_odom)
-    sub_path_change = rospy.Subscriber('/path_change', Bool, clbk_path_change)
-
-    srv = rospy.Service('go_to_point_switch', SetBool, go_to_point_switch)
+    init_services()
+    init_publisher()
+    init_subscribers()
 
     rate = rospy.Rate(20)
     while not rospy.is_shutdown():
-        if not active_:
+        if not active_ or not startStop_:
+            rate.sleep()
             continue
         else:
             if state_ == 0:
@@ -169,6 +169,34 @@ def main():
                 rospy.logerr('Unknown state!')
 
         rate.sleep()
+
+
+def init_publisher():
+    """
+    Initializes Publisher:
+    pub_cmd_: Publishes to /cmd_vel
+    """
+    global pub_cmd_
+    pub_cmd_ = rospy.Publisher('/cmd_vel', Twist, queue_size=1)
+
+
+def init_subscribers():
+    """
+    Initializes Subscribers:
+    sub_drive: Subscribes to /start_stop and executes clbk_drive
+    sub_odom: Subscribes to /odom and executes clbk_position
+    sub_path_change: Subscribes to /path_change and executes clbk_path_change
+    """
+    sub_drive = rospy.Subscriber('/start_stop', Bool, clbk_drive)
+    sub_odom = rospy.Subscriber('/odom', Odometry, clbk_odom)
+    sub_path_change = rospy.Subscriber('/path_change', Bool, clbk_path_change)
+
+
+def init_services():
+    """
+    Initializes service:
+    """
+    srv = rospy.Service('go_to_point_switch', SetBool, go_to_point_switch)
 
 
 if __name__ == '__main__':
