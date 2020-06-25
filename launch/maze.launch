@@ -44,8 +44,8 @@
 
   <node pkg="labyrinth_turtlebot" name="start_stop_server" type="start_stop_server.py" />
   <node pkg="labyrinth_turtlebot" name="find_the_entry" type="find_the_entry.py"/>
-  <node pkg="labyrinth_turtlebot" name="follow_wall" type="follow_wall.py"/>
-  <node pkg="labyrinth_turtlebot" name="coordinator" type="coordinator.py" output="screen"/>
+  <node pkg="labyrinth_turtlebot" name="follow_wall" type="follow_wall.py" output="screen"/>
+  <node pkg="labyrinth_turtlebot" name="coordinator" type="coordinator.py"/>
   <!-- <node pkg="labyrinth_turtlebot" type="go_to_point.py" name="go_to_point"/> -->
 
 </launch>

@@ -26,9 +26,9 @@ yaw_degree = 0.0
 
 def clbk_laser(msg):
     """
-    Callback for the /scan topic  
-    Gets Laser Data as Input and calculates the closest distance to an object in a given range  
-    The ranges are left, front-left, front, front-right, right    
+    Callback for the /scan topic
+    Gets Laser Data as Input and calculates the closest distance to an object in a given range
+    The ranges are left, front-left, front, front-right, right
     """
     global regions_
     regions_ = {
@@ -43,8 +43,8 @@ def clbk_laser(msg):
 
 def clbk_drive(msg):
     """
-    Callback for the /start_stop service topic  
-    Starts/Pauses the roboters activities based on the given Value{True, False}  
+    Callback for the /start_stop service topic
+    Starts/Pauses the roboters activities based on the given Value{True, False}
     """
     global startStop_
     startStop_ = msg.data
@@ -66,9 +66,9 @@ def change_state(state):
 
 def clbk_position(msg):
     """
-    Callback for the /odom Topic  
-    Get's the odometry data of the roboter and extracts valuable information  
-    position_: Current world position of roboter  
+    Callback for the /odom Topic
+    Get's the odometry data of the roboter and extracts valuable information
+    position_: Current world position of roboter
     """
     global orientation_, position_, roll, pitch, yaw, yaw_degree  # position_marker,
     position_ = msg.pose.pose.position
@@ -79,8 +79,8 @@ def clbk_position(msg):
 
 def coordinator():
     """
-    Main function of this nodes  
-    Calls Init functions and wait's for changes to activate different parts of the robot  
+    Main function of this nodes
+    Calls Init functions and wait's for changes to activate different parts of the robot
     """
     rospy.init_node('coordinator')
 
@@ -98,7 +98,7 @@ def coordinator():
         else:
             change_state(0)
         if state_ == 0:
-            if 0.15 < regions_['left'] < 1.2 or 0.15 < regions_['right'] < 1.2:
+            if 0.12 < regions_['left'] < 1.2 or 0.12 < regions_['right'] < 1.2:
                 change_state(1)
 
         rate.sleep()
@@ -106,8 +106,8 @@ def coordinator():
 
 def init_subscribers():
     """
-    Initializes Subscribers:  
-    sub_laser: Subscribes to /scan and executes clbk_laser  
+    Initializes Subscribers:
+    sub_laser: Subscribes to /scan and executes clbk_laser
     sub_drive: Subscribes to /start_stop and executes clbk_drive
     sub_odom: Subscribes to /odom and executes clbk_position
     """
@@ -119,9 +119,9 @@ def init_subscribers():
 def init_services():
     """
     Initializes connection to services:
-    /find_the_entry_switch:  
-    /wall_follower_switch:  
-    /starts_stop: Used in /sub_drive for the clbk_drive callback  
+    /find_the_entry_switch:
+    /wall_follower_switch:
+    /starts_stop: Used in /sub_drive for the clbk_drive callback
     """
     global srv_client_find_the_entry_, srv_client_wall_follower_
 

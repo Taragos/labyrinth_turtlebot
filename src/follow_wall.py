@@ -20,9 +20,16 @@ state_ = 0
 state_dict_ = {
     0: 'find the wall',
     1: 'turn left',
-    2: 'follow the wall',
+    2: 'turn right',
+    3: 'follow the wall',
+    4: 'turn right on point',
+    5: 'turn left on point',
 }
 startStop_ = False
+
+wall_found = 0
+wall_dist = 0.2
+max_speed = 0.05
 
 
 def wall_follower_switch(req):
@@ -63,60 +70,74 @@ def change_state(state):
 def determine_direction_of_obstacle():
     """
     Checks the Regions and determines in which regions are obstacles  
-    Checks against a variable: d, that set's the maximum distance to the obstacle  
+    Checks against a variable: wall_dist, that set's the maximum distance to the obstacle
     """
-    global regions_, entry_found_
+    global regions_, entry_found_, wall_dist, wall_found
     regions = regions_
     state_description = ''
 
-    d = 0.5
-
-    # Nothin in Front/Front-Left/Front-Right
-    if regions['front'] > d and regions['fleft'] > d and regions['fright'] > d:
-        state_description = 'case 1 - nothing'
-        change_state(0)
-    # Found something in front, but nothing in Front-Left/Front-Right
-    elif regions['front'] < d < regions['fleft'] and regions['fright'] > d:
-        state_description = 'case 2 - front'
-        change_state(1)
-    # Found something in Front-Right, but noting in Front/Front-Left
-    elif regions['front'] > d > regions['fright'] and regions['fleft'] > d:
-        state_description = 'case 3 - fright'
-        change_state(2)
-    # Found something in Front-Left, but nothing in Front/Front-Right
-    elif regions['front'] > d > regions['fleft'] and regions['fright'] > d:
-        state_description = 'case 4 - fleft'
-        change_state(0)
-    # Found something in Front/Front-Right, but nothing in Front-Left    
-    elif regions['front'] < d < regions['fleft'] and regions['fright'] < d:
-        state_description = 'case 5 - front and fright'
-        change_state(1)
-    # Found something in Front/Front-Left, but nothing in Front-Right    
-    elif regions['front'] < d < regions['fright'] and regions['fleft'] < d:
-        state_description = 'case 6 - front and fleft'
-        change_state(1)
-    # Found something in Front/Front-Right/Front-Left    
-    elif regions['front'] < d and regions['fleft'] < d and regions['fright'] < d:
-        state_description = 'case 7 - front and fleft and fright'
-        change_state(1)
-    # Found something in Front-Left/Front-Right, but nothing in Front
-    elif regions['front'] > d > regions['fleft'] and regions['fright'] < d:
-        state_description = 'case 8 - fleft and fright'
+    if wall_found == 0:
         change_state(0)
     else:
-        state_description = 'unknown case'
-        rospy.loginfo(regions)
-
-    rospy.loginfo(state_description)
+        # 1 = right, 2 = left, 3 = wall follow, 4 = point rotate
+        if regions['fright'] > wall_dist:
+            change_state(1)
+        elif regions['fright'] < wall_dist and regions['front'] < wall_dist:
+            change_state(5)
+        elif regions['front'] < wall_dist:
+            change_state(4)
+        elif regions['fright'] < wall_dist:
+            change_state(2)
+        elif regions['fright'] > wall_dist > regions['front']:
+            change_state(4)
+        else:
+            change_state(3)
+    #
+    #     if regions['front'] > wall_dist and regions['fright'] > wall_dist:
+    #         state_description = 'case 1 - nothing'
+    #         change_state(1)
+    #     elif regions['front'] < wall_dist < regions['fright']:
+    #         state_description = 'case 2 - front'
+    #         change_state(2)
+    #     elif regions['front'] > wall_dist > regions['fright']:
+    #         state_description = 'case 3 - fright'
+    #         change_state(3)
+    #     elif regions['front'] > wall_dist and regions['fright'] > wall_dist:
+    #         state_description = 'case 4 - fleft'
+    #         change_state(1)
+    #     elif regions['front'] < wall_dist and regions['fright'] < wall_dist:
+    #         state_description = 'case 5 - front and fright'
+    #         change_state(2)
+    #     elif regions['front'] < wall_dist and regions['fleft'] < wall_dist:
+    #         state_description = 'case 6 - front and fleft'
+    #         change_state(2)
+    #     elif regions['front'] < wall_dist and regions['fright'] < wall_dist:
+    #         state_description = 'case 7 - front and fleft and fright'
+    #         change_state(2)
+    #     elif regions['front'] > wall_dist > regions['fright']:
+    #         state_description = 'case 8 - fleft and fright'
+    #         change_state(2)
+    #     else:
+    #         state_description = 'unknown case'
+    #         rospy.loginfo(regions)
+    #
+    # rospy.loginfo(state_description)
 
 
 def find_wall():
     """
-    Generates a Twist Message, that let's the robot drive in a circle
+    Generates a Twist Message, that let's the robot turn left
     """
+    global regions_, max_speed, wall_found
+    regions = regions_
     msg = Twist()
-    msg.linear.x = 0.2
-    msg.angular.z = -0.3
+    if regions['front'] < wall_dist or regions['fleft'] < wall_dist or regions['fright'] < wall_dist:
+        wall_found = 1
+        msg.linear.x = 0
+        msg.angular.z = 0
+    else:
+        msg.linear.x = max_speed
+        msg.angular.z = 0.1
     return msg
 
 
@@ -125,7 +146,38 @@ def turn_left():
     Generates a Twist Message, that let's the robot turn left
     """
     msg = Twist()
-    msg.angular.z = 0.3
+    msg.linear.x = max_speed
+    msg.angular.z = 0.5
+    return msg
+
+
+def turn_right():
+    """
+    Generates a Twist Message, that let's the robot turn right
+    """
+    msg = Twist()
+    msg.linear.x = max_speed
+    msg.angular.z = -0.5
+    return msg
+
+
+def turn_right_on_point():
+    """
+    Generates a Twist Message, that let's the robot turn right
+    """
+    msg = Twist()
+    msg.linear.x = 0
+    msg.angular.z = -0.5
+    return msg
+
+
+def turn_left_on_point():
+    """
+    Generates a Twist Message, that let's the robot turn right
+    """
+    msg = Twist()
+    msg.linear.x = 0
+    msg.angular.z = -0.5
     return msg
 
 
@@ -133,10 +185,11 @@ def follow_the_wall():
     """
     Generates a Twist Message, that let's the robot drive forward
     """
-    global regions_
+    global max_speed
 
     msg = Twist()
-    msg.linear.x = 0.2
+    msg.linear.x = max_speed
+    msg.angular.z = 0
     return msg
 
 
@@ -165,9 +218,15 @@ def main():
         if state_ == 0:
             msg = find_wall()
         elif state_ == 1:
-            msg = turn_left()
+            msg = turn_right()
         elif state_ == 2:
+            msg = turn_left()
+        elif state_ == 3:
             msg = follow_the_wall()
+        elif state_ == 4:
+            msg = turn_right()
+        elif state_ == 5:
+            msg = turn_left_on_point()
             pass
         else:
             rospy.logerr('Unknown state!')
