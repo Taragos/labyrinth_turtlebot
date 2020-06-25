@@ -22,10 +22,10 @@ pub_path_change = None
 path = None
 position_ = Point()
 yaw_ = 0
-a_star_ = True
-entry_found_ = False
 startStop_ = False
 in_lab_ = False
+entry_found_ = True
+a_star_ = False
 path_found_ = False
 
 

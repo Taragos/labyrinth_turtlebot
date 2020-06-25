@@ -66,7 +66,7 @@ def take_action():
     regions = regions_
 
     if active_ and entry_found_ == 0:
-        if regions['left'] < 1.2 or regions['right'] < 1.2:
+        if regions['left'] < 0.2 and regions['right'] < 0.2:
             entry_found_ = 1
             pub_entry_.publish(True)
             marker(int(position_.x.real), int(position_.y.real))
