@@ -5,15 +5,12 @@ import rospy
 from std_msgs.msg import Bool
 from std_srvs.srv import *
 
-
 def handle_start_stop_req(req):
     if req.data:
         pub_drive.publish(True)
-        rospy.loginfo("Starting")
         return SetBoolResponse(success=True)
     elif not req.data:
         pub_drive.publish(False)
-        rospy.loginfo("Stopping")
         return SetBoolResponse(success=True)
     else:
         return SetBoolResponse(success=False)

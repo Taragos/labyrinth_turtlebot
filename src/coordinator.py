@@ -77,6 +77,10 @@ def clbk_position(msg):
     yaw_degree = (yaw * (180 / math.pi))
 
 def coordinator():
+    """
+    Main function of this nodes  
+    Calls Init functions and wait's for changes to activate different parts of the robot  
+    """
     rospy.init_node('coordinator')
 
     init_services()
@@ -92,7 +96,6 @@ def coordinator():
             continue
         else:
             change_state(0)
-
         if state_ == 0:
             if 0.15 < regions_['left'] < 1.2 or 0.15 < regions_['right'] < 1.2:
                 change_state(1)
