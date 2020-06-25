@@ -89,6 +89,9 @@ def clbk_drive(msg):
 
 
 def take_action():
+    """
+    Method for setting entry Markers
+    """
     global active_, regions_, entry_found_, position_, pub_entry_
     regions = regions_
 
