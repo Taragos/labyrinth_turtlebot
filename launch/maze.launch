@@ -40,7 +40,7 @@
     <param name="publish_frequency" type="double" value="50.0" />
   </node>
 
-  <node pkg="rviz" name="rviz" type="rviz" args="-d $(find labyrinth_turtlebot)/config/rviz_config.rviz"  />
+  <node pkg="rviz" name="rviz" type="rviz" args="-d $(find labyrinth_turtlebot)/config/config.rviz"  />
 
   <node pkg="labyrinth_turtlebot" name="start_stop_server" type="start_stop_server.py" />
   <node pkg="labyrinth_turtlebot" name="find_the_entry" type="find_the_entry.py"/>
