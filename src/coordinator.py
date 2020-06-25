@@ -17,7 +17,6 @@ startStop_ = False
 regions_ = None
 state_desc_ = ['Find the entry', 'wall following', 'Go to point']
 state_ = 0
-pub_visualization_marker_ = None
 orientation_ = Point()
 position_ = Point()
 roll = pitch = yaw = 0.0
@@ -82,7 +81,6 @@ def coordinator():
 
     init_subscribers()
     init_services()
-    init_publishers()
     rate = rospy.Rate(20)
 
     while not rospy.is_shutdown():
@@ -101,9 +99,6 @@ def coordinator():
 
         rate.sleep()
 
-def init_publishers():
-    pub_cmd = rospy.Publisher('cmd_vel', Twist, queue_size=10)
-
 def init_subscribers():
     sub_laser = rospy.Subscriber('/scan', LaserScan, clbk_laser)
     sub_drive = rospy.Subscriber('/start_stop', Bool, clbk_drive)
@@ -118,9 +113,6 @@ def init_services():
     
     srv_client_find_the_entry_ = rospy.ServiceProxy('/find_the_entry_switch', SetBool)
     srv_client_wall_follower_ = rospy.ServiceProxy('/wall_follower_switch', SetBool)
-
-    
-
 
 if __name__ == '__main__':
     try:
