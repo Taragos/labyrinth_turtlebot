@@ -24,7 +24,7 @@ x = y = 0.0
 yaw_degree = 0.0
 
 
-def clbk_laser(msg): 
+def clbk_laser(msg):
     """
     Callback for the /scan topic  
     Gets Laser Data as Input and calculates the closest distance to an object in a given range  
@@ -33,7 +33,7 @@ def clbk_laser(msg):
     global regions_
     regions_ = {
         'left': min(min(msg.ranges[72:107]), 10),
-        'flight': min(min(msg.ranges[36:71]), 10),
+        'fleft': min(min(msg.ranges[36:71]), 10),
         'front': min(min(min(msg.ranges[0:35]), min(msg.ranges[324:359])), 10),
         'fright': min(min(msg.ranges[288:323]), 10),
         'right': min(min(msg.ranges[252:287]), 10),
@@ -76,6 +76,7 @@ def clbk_position(msg):
     (roll, pitch, yaw) = euler_from_quaternion([orientation_.x, orientation_.y, orientation_.z, orientation_.w])
     yaw_degree = (yaw * (180 / math.pi))
 
+
 def coordinator():
     """
     Main function of this nodes  
@@ -102,6 +103,7 @@ def coordinator():
 
         rate.sleep()
 
+
 def init_subscribers():
     """
     Initializes Subscribers:  
@@ -112,6 +114,7 @@ def init_subscribers():
     sub_laser = rospy.Subscriber('/scan', LaserScan, clbk_laser)
     sub_drive = rospy.Subscriber('/start_stop', Bool, clbk_drive)
     sub_odom = rospy.Subscriber('/odom', Odometry, clbk_position)
+
 
 def init_services():
     """
@@ -125,9 +128,10 @@ def init_services():
     rospy.wait_for_service('/find_the_entry_switch')
     rospy.wait_for_service('/wall_follower_switch')
     rospy.wait_for_service('/start_stop')
-    
+
     srv_client_find_the_entry_ = rospy.ServiceProxy('/find_the_entry_switch', SetBool)
     srv_client_wall_follower_ = rospy.ServiceProxy('/wall_follower_switch', SetBool)
+
 
 if __name__ == '__main__':
     try:

@@ -158,13 +158,7 @@ def main():
 
         msg = Twist()
 
-        if not active_:
-            rate.sleep()
-            continue
-
-        if not startStop_:
-            msg.linear.x = 0
-            pub_cmd_vel_.publish(msg)
+        if not active_ or not startStop_:
             rate.sleep()
             continue
 
