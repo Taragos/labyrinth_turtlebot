@@ -25,10 +25,12 @@ x = y = 0.0
 yaw_degree = 0.0
 
 
-# callbacks
-# Gets Laser Data as Input and calculates the closest distance to an object in a given range
-# The ranges are left, front-left, front, front-right, right
-def clbk_laser(msg):
+def clbk_laser(msg): 
+    """
+    Callback for the /scan topic  
+    Gets Laser Data as Input and calculates the closest distance to an object in a given range  
+    The ranges are left, front-left, front, front-right, right    
+    """
     global regions_
     regions_ = {
         'left': min(min(msg.ranges[72:107]), 10),
@@ -41,6 +43,10 @@ def clbk_laser(msg):
 
 
 def clbk_drive(msg):
+    """
+    Callback for the /start_stop service topic  
+    Starts/Pauses the roboters activities based on the given Value{True, False}  
+    """
     global startStop_
     startStop_ = msg.data
 
@@ -60,6 +66,11 @@ def change_state(state):
 
 
 def position(msg):
+    """
+    Callback for the /odom Topic  
+    Get's the odometry data of the roboter and extracts valuable information  
+    position_: Current world position of roboter  
+    """
     global orientation_, position_, roll, pitch, yaw, yaw_degree  # position_marker,
     position_ = msg.pose.pose.position
     orientation_ = msg.pose.pose.orientation
@@ -67,25 +78,11 @@ def position(msg):
     yaw_degree = (yaw * (180 / math.pi))
 
 def coordinator():
-    global srv_client_find_the_entry_, srv_client_wall_follower_, pub_visualization_marker_
-    global regions_, state_, startStop_
-
     rospy.init_node('coordinator')
 
-    pub_cmd = rospy.Publisher('cmd_vel', Twist, queue_size=10)
-
-    sub_laser = rospy.Subscriber('/scan', LaserScan, clbk_laser)
-
-    rospy.wait_for_service('/find_the_entry_switch')
-    rospy.wait_for_service('/wall_follower_switch')
-    rospy.wait_for_service('/start_stop')
-
-    sub_drive = rospy.Subscriber('/start_stop', Bool, clbk_drive)
-    srv_client_find_the_entry_ = rospy.ServiceProxy('/find_the_entry_switch', SetBool)
-    srv_client_wall_follower_ = rospy.ServiceProxy('/wall_follower_switch', SetBool)
-
-    sub_odom = rospy.Subscriber('/odom', Odometry, position)
-
+    init_subscribers()
+    init_services()
+    init_publishers()
     rate = rospy.Rate(20)
 
     while not rospy.is_shutdown():
@@ -104,6 +101,25 @@ def coordinator():
 
         rate.sleep()
 
+def init_publishers():
+    pub_cmd = rospy.Publisher('cmd_vel', Twist, queue_size=10)
+
+def init_subscribers():
+    sub_laser = rospy.Subscriber('/scan', LaserScan, clbk_laser)
+    sub_drive = rospy.Subscriber('/start_stop', Bool, clbk_drive)
+    sub_odom = rospy.Subscriber('/odom', Odometry, position)
+
+def init_services():
+    global srv_client_find_the_entry_, srv_client_wall_follower_
+
+    rospy.wait_for_service('/find_the_entry_switch')
+    rospy.wait_for_service('/wall_follower_switch')
+    rospy.wait_for_service('/start_stop')
+    
+    srv_client_find_the_entry_ = rospy.ServiceProxy('/find_the_entry_switch', SetBool)
+    srv_client_wall_follower_ = rospy.ServiceProxy('/wall_follower_switch', SetBool)
+
+    
 
 
 if __name__ == '__main__':
