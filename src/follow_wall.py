@@ -26,13 +26,13 @@ state_dict_ = {
     3: 'follow the wall',
     4: 'turn right on point',
     5: 'turn left on point',
-    6: 'drive backwards',
+    # 6: 'drive backwards',
 }
 startStop_ = False
 
 wall_found = 0
 wall_dist = 0.25
-max_speed = 0.05
+max_speed = 0.2
 
 inf = 3.6
 
@@ -121,13 +121,13 @@ def determine_direction_of_obstacle():
     # rospy.loginfo("Right: " + str(wall_right()))
     # rospy.loginfo("---------------------------")
 
-    rospy.loginfo("---------------------------")
-    rospy.loginfo("Left: " + str(regions_['left']))
-    rospy.loginfo("Left: " + str(regions_['fleft']))
-    rospy.loginfo("Front: " + str(regions_['front']))
-    rospy.loginfo("Right: " + str(regions_['fright']))
-    rospy.loginfo("Right: " + str(regions_['right']))
-    rospy.loginfo("---------------------------")
+    # rospy.loginfo("---------------------------")
+    # rospy.loginfo("Left: " + str(regions_['left']))
+    # rospy.loginfo("Left: " + str(regions_['fleft']))
+    # rospy.loginfo("Front: " + str(regions_['front']))
+    # rospy.loginfo("Right: " + str(regions_['fright']))
+    # rospy.loginfo("Right: " + str(regions_['right']))
+    # rospy.loginfo("---------------------------")
 
     if wall_found == 0:
         change_state(0)
@@ -135,9 +135,7 @@ def determine_direction_of_obstacle():
         # 0: 'find the wall', 1: 'turn left', 2: 'turn right', 3: 'follow the wall', 4: 'turn right on point',
         # 5: 'turn left on point',
 
-        if regions_['left'] < 0.12 or regions_['fleft'] < 0.12 or regions_['front'] < 0.12 or regions_['fright'] < 0.12 or regions_['right'] < 0.12:
-            change_state(6)
-        elif is_inner_corner():
+        if is_inner_corner():
             change_state(5)
         elif wall_front() and wall_fleft() and not wall_fright():
             change_state(4)
@@ -229,7 +227,7 @@ def turn_right():
     Generates a Twist Message, that let's the robot turn right
     """
     msg = Twist()
-    msg.linear.x = max_speed
+    msg.linear.x = max_speed/4
     msg.angular.z = -0.1
     return msg
 
@@ -251,21 +249,21 @@ def follow_the_wall():
     global max_speed
 
     msg = Twist()
-    msg.linear.x = max_speed
+    msg.linear.x = max_speed/4
     msg.angular.z = 0
     return msg
 
 
-def drive_backwards():
-    """
-    Generates a Twist Message, that let's the robot drive backwards
-    """
-    global max_speed
-
-    msg = Twist()
-    msg.linear.x = -max_speed
-    msg.angular.z = -0.3
-    return msg
+# def drive_backwards():
+#     """
+#     Generates a Twist Message, that let's the robot drive backwards
+#     """
+#     global max_speed
+#
+#     msg = Twist()
+#     msg.linear.x = -max_speed/4
+#     msg.angular.z = -0.1
+#     return msg
 
 
 def main():
@@ -302,8 +300,6 @@ def main():
             msg = turn_right_on_point()
         elif state_ == 5:
             msg = turn_left_on_point()
-        elif state_ == 6:
-            msg = drive_backwards()
             pass
         else:
             rospy.logerr('Unknown state!')
