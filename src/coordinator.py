@@ -1,140 +1,113 @@
 #!/usr/bin/env python
-import math
 
-import rospy
-from geometry_msgs.msg import Twist, Point, PoseWithCovariance
+import rospy, time
+from geometry_msgs.msg import Twist
 from sensor_msgs.msg import LaserScan
-from std_msgs.msg import Bool
-from nav_msgs.msg import Odometry
-from rospy import Time
-from std_srvs.srv import SetBoolResponse, SetBool
-from tf.transformations import euler_from_quaternion
-from visualization_msgs.msg import Marker
 
-srv_client_find_the_entry_ = None
-srv_client_wall_follower_ = None
-startStop_ = False
-regions_ = None
-state_desc_ = ['Find the entry', 'wall following', 'Go to point']
-state_ = 0
-orientation_ = Point()
-position_ = Point()
-roll = pitch = yaw = 0.0
-x = y = 0.0
-yaw_degree = 0.0
+def scan_callback(msg):
+    global range_front
+    global range_right
+    global range_left
+    global ranges
+    global min_front,i_front, min_right,i_right, min_left ,i_left
+    
+    ranges = msg.ranges
+    # get the range of a few points
+    # in front of the robot (between 5 to -5 degrees)
+    range_front[:5] = msg.ranges[5:0:-1]  
+    range_front[5:] = msg.ranges[-1:-5:-1]
+    # to the right (between 300 to 345 degrees)
+    range_right = msg.ranges[300:345]
+    # to the left (between 15 to 60 degrees)
+    range_left = msg.ranges[60:15:-1]
+    # get the minimum values of each range 
+    # minimum value means the shortest obstacle from the robot
+    min_range,i_range = min( (ranges[i_range],i_range) for i_range in xrange(len(ranges)) )
+    min_front,i_front = min( (range_front[i_front],i_front) for i_front in xrange(len(range_front)) )
+    min_right,i_right = min( (range_right[i_right],i_right) for i_right in xrange(len(range_right)) )
+    min_left ,i_left  = min( (range_left [i_left ],i_left ) for i_left  in xrange(len(range_left )) )
+    
 
+# Initialize all variables
+range_front = []
+range_right = []
+range_left  = []
+min_front = 0
+i_front = 0
+min_right = 0
+i_right = 0
+min_left = 0
+i_left = 0
 
-def clbk_laser(msg):
-    """
-    Callback for the /scan topic  
-    Gets Laser Data as Input and calculates the closest distance to an object in a given range  
-    The ranges are left, front-left, front, front-right, right    
-    """
-    global regions_
-    regions_ = {
-        'left': min(min(msg.ranges[72:107]), 10),
-        'fleft': min(min(msg.ranges[36:71]), 10),
-        'front': min(min(min(msg.ranges[0:35]), min(msg.ranges[324:359])), 10),
-        'fright': min(min(msg.ranges[288:323]), 10),
-        'right': min(min(msg.ranges[252:287]), 10),
-    }
-    rospy.loginfo(regions_)
+# Create the node
+cmd_vel_pub = rospy.Publisher('cmd_vel', Twist, queue_size = 1) # to move the robot
+scan_sub = rospy.Subscriber('scan', LaserScan, scan_callback)   # to read the laser scanner
+rospy.init_node('maze_explorer')
 
+command = Twist()
+command.linear.x = 0.0
+command.angular.z = 0.0
+        
+rate = rospy.Rate(10)
+time.sleep(1) # wait for node to initialize
 
-def clbk_drive(msg):
-    """
-    Callback for the /start_stop service topic  
-    Starts/Pauses the roboters activities based on the given Value{True, False}  
-    """
-    global startStop_
-    startStop_ = msg.data
+near_wall = 0 # start with 0, when we get to a wall, change to 1
 
+# Turn the robot right at the start
+# to avoid the 'looping wall'
+print("Turning...")
+command.angular.z = -0.5
+command.linear.x = 0.1
+cmd_vel_pub.publish(command)
+time.sleep(2)
+       
+while not rospy.is_shutdown():
 
-def change_state(state):
-    global state_, state_desc_
-    global srv_client_find_the_entry_, srv_client_wall_follower_
-    state_ = state
-    log = "state changed: %s" % state_desc_[state]
-    # rospy.loginfo(log)
-    if state_ == 0:
-        resp = srv_client_find_the_entry_(True)
-        resp = srv_client_wall_follower_(False)
-    if state_ == 1:
-        resp = srv_client_find_the_entry_(False)
-        resp = srv_client_wall_follower_(True)
-
-
-def clbk_position(msg):
-    """
-    Callback for the /odom Topic  
-    Get's the odometry data of the roboter and extracts valuable information  
-    position_: Current world position of roboter  
-    """
-    global orientation_, position_, roll, pitch, yaw, yaw_degree  # position_marker,
-    position_ = msg.pose.pose.position
-    orientation_ = msg.pose.pose.orientation
-    (roll, pitch, yaw) = euler_from_quaternion([orientation_.x, orientation_.y, orientation_.z, orientation_.w])
-    yaw_degree = (yaw * (180 / math.pi))
-
-
-def coordinator():
-    """
-    Main function of this nodes  
-    Calls Init functions and wait's for changes to activate different parts of the robot  
-    """
-    rospy.init_node('coordinator')
-
-    init_services()
-    init_subscribers()
-    rate = rospy.Rate(20)
-
-    while not rospy.is_shutdown():
-        if regions_ is None:
-            continue
-
-        if not startStop_:
-            rate.sleep()
-            continue
+    # The algorithm:
+    # 1. Robot moves forward to be close to a wall
+    # 2. Start following left wall.
+    # 3. If too close to the left wall, reverse a bit to get away
+    # 4. Otherwise, follow wall by zig-zagging along the wall
+    # 5. If front is close to a wall, turn until clear
+    while(near_wall == 0 and not rospy.is_shutdown()): #1
+        print("Moving towards a wall.")
+        if(min_front > 0.2 and min_right > 0.2 and min_left > 0.2):    
+            command.angular.z = -0.1    # if nothing near, go forward
+            command.linear.x = 0.15
+            print "C"
+        elif(min_left < 0.2):           # if wall on left, start tracking
+            near_wall = 1       
+            print "A"            
         else:
-            change_state(0)
-        if state_ == 0:
-            if 0.15 < regions_['left'] < 1.2 or 0.15 < regions_['right'] < 1.2:
-                change_state(1)
+            command.angular.z = -0.25   # if not on left, turn right 
+            command.linear.x = 0.0
 
-        rate.sleep()
-
-
-def init_subscribers():
-    """
-    Initializes Subscribers:  
-    sub_laser: Subscribes to /scan and executes clbk_laser  
-    sub_drive: Subscribes to /start_stop and executes clbk_drive
-    sub_odom: Subscribes to /odom and executes clbk_position
-    """
-    sub_laser = rospy.Subscriber('/scan', LaserScan, clbk_laser)
-    sub_drive = rospy.Subscriber('/start_stop', Bool, clbk_drive)
-    sub_odom = rospy.Subscriber('/odom', Odometry, clbk_position)
-
-
-def init_services():
-    """
-    Initializes connection to services:
-    /find_the_entry_switch:  
-    /wall_follower_switch:  
-    /starts_stop: Used in /sub_drive for the clbk_drive callback  
-    """
-    global srv_client_find_the_entry_, srv_client_wall_follower_
-
-    rospy.wait_for_service('/find_the_entry_switch')
-    rospy.wait_for_service('/wall_follower_switch')
-    rospy.wait_for_service('/start_stop')
-
-    srv_client_find_the_entry_ = rospy.ServiceProxy('/find_the_entry_switch', SetBool)
-    srv_client_wall_follower_ = rospy.ServiceProxy('/wall_follower_switch', SetBool)
-
-
-if __name__ == '__main__':
-    try:
-        coordinator()
-    except rospy.ROSInterruptException:
-        pass
+        cmd_vel_pub.publish(command)
+        
+    else:   # left wall detected
+        if(min_front > 0.2): #2
+            if(min_left < 0.12):    #3
+                print("Range: {:.2f}m - Too close. Backing up.".format(min_left))
+                command.angular.z = -1.2
+                command.linear.x = -0.1
+            elif(min_left > 0.15):  #4
+                print("Range: {:.2f}m - Wall-following; turn left.".format(min_left))
+                command.angular.z = 1.2
+                command.linear.x = 0.15
+            else:
+                print("Range: {:.2f}m - Wall-following; turn right.".format(min_left))
+                command.angular.z = -1.2
+                command.linear.x = 0.15
+                
+        else:   #5
+            print("Front obstacle detected. Turning away.")
+            command.angular.z = -1.0
+            command.linear.x = 0.0
+            cmd_vel_pub.publish(command)
+            while(min_front < 0.3 and not rospy.is_shutdown()):      
+                pass
+        # publish command 
+        cmd_vel_pub.publish(command)
+    # wait for the loop
+    rate.sleep()
+    
