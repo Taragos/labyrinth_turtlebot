@@ -9,7 +9,7 @@
   <arg name="roll" default="0"/>
   <arg name="pitch" default="0"/>
   <arg name="yaw" default="3"/>
-  <arg name="direction" default="-1"/>
+  <arg name="direction" default="1"/>
   <param name="initial_x" value="$(arg initial_x)" />
   <param name="initial_y" value="$(arg initial_y)" />
   <param name="direction" value="$(arg direction)" />

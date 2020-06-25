@@ -10,8 +10,8 @@ from std_srvs.srv import *
 hz = 20  # Cycle Frequency
 inf = 3.5  # Limit to Laser sensor range in meters, all distances above this value are
 #                  considered out of sensor range
-wall_dist = 0.17  # Distance desired from the wall
-max_speed = 0.1  # Maximum speed of the robot on meters/seconds
+wall_dist = 0.5  # Distance desired from the wall
+max_speed = 0.2  # Maximum speed of the robot on meters/seconds
 active_ = False  # active state
 entry_found_ = 0
 startStop_ = False
@@ -53,11 +53,12 @@ def wall_follower_switch(req):
 
 
 # callbacks
+
 def clbk_laser(msg):
     """
-    Read sensor messages, and determine distance to each region.
-    Manipulates the values measured by the sensor.
-    Callback function for the subscription to the published Laser Scan values.
+    Callback for the /scan topic
+    Gets Laser Data as Input and calculates the closest distance to an object in a given range
+    The ranges are left, front-left, front, front-right, right
     """
     global regions_, inf
     regions_ = {
@@ -72,6 +73,10 @@ def clbk_laser(msg):
 
 
 def clbk_drive(msg):
+    """
+    Callback for the /start_stop service topic
+    Starts/Pauses the roboters activities based on the given Value{True, False}
+    """
     global startStop_
     startStop_ = msg.data
 
@@ -170,7 +175,10 @@ def find_wall():
         msg.angular.z = 0
     else:
         msg.linear.x = max_speed
-        msg.angular.z = direction * 0.3
+        if direction == -1:
+            msg.angular.z = direction * 0.1
+        else:
+            msg.angular.z = direction * -0.1
     return msg
 
 
@@ -217,12 +225,9 @@ def main():
 
     rospy.init_node('follow_wall')
 
-    srv = rospy.Service('wall_follower_switch', SetBool, wall_follower_switch)
-
-    pub_cmd_vel_ = rospy.Publisher('/cmd_vel', Twist, queue_size=1)
-
-    sub_scan = rospy.Subscriber('/scan', LaserScan, clbk_laser)
-    sub_drive = rospy.Subscriber('/start_stop', Bool, clbk_drive)
+    init_services()
+    init_publisher()
+    init_subscribers()
 
     change_state(0)
 
@@ -249,6 +254,32 @@ def main():
         pub_cmd_vel_.publish(msg)
 
         rate.sleep()
+
+
+def init_publisher():
+    """
+    Initializes Publisher:
+    pub_path_change: Publishes to /path_change and executes clbk_laser
+    """
+    global pub_cmd_vel_
+    pub_cmd_vel_ = rospy.Publisher('/cmd_vel', Twist, queue_size=1)
+
+
+def init_subscribers():
+    """
+    Initializes Subscribers:
+    sub_laser: Subscribes to /scan and executes clbk_laser
+    sub_drive: Subscribes to /start_stop and executes clbk_drive
+    """
+    sub_scan = rospy.Subscriber('/scan', LaserScan, clbk_laser)
+    sub_drive = rospy.Subscriber('/start_stop', Bool, clbk_drive)
+
+
+def init_services():
+    """
+    Initializes service:
+    """
+    srv = rospy.Service('wall_follower_switch', SetBool, wall_follower_switch)
 
 
 if __name__ == '__main__':

@@ -11,6 +11,7 @@ from std_srvs.srv import *
 from visualization_msgs.msg import Marker, MarkerArray
 
 # Parameters
+hz = 1
 entry_found_ = 0
 startStop_ = False
 dist_left = 0.0
@@ -18,6 +19,8 @@ dist_right = 0.0
 marker_entries_ = MarkerArray()
 position_ = Point()
 active_ = False
+max_speed = 0.2
+inf = 3.6
 
 # Publisher
 pub_cmd_vel_ = None
@@ -44,29 +47,43 @@ def find_the_entry_switch(req):
 
 
 # callbacks
-def clbk_odom(msg):
+def clbk_position(msg):
+    """
+    Callback for the /odom Topic
+    Get's the odometry data of the roboter and extracts valuable information
+    position_: Current world position of roboter
+    """
     global position_
 
     position_ = msg.pose.pose.position
 
 
 def clbk_laser(msg):
-    global regions_, dist_left, dist_right
+    """
+    Callback for the /scan topic
+    Gets Laser Data as Input and calculates the closest distance to an object in a given range
+    The ranges are left, front-left, front, front-right, right
+    """
+    global regions_, inf, dist_left, dist_right
     regions_ = {
-        'right': min(min(msg.ranges[72:107]), 10),
-        'fright': min(min(msg.ranges[36:71]), 10),
-        'front': min(min(min(msg.ranges[0:35]), min(msg.ranges[324:359])), 10),
-        'fleft': min(min(msg.ranges[288:323]), 10),
-        'left': min(min(msg.ranges[252:287]), 10),
+        'left': min(min(msg.ranges[72:107]), inf),
+        'fleft': min(min(msg.ranges[36:71]), inf),
+        'front': min(min(min(msg.ranges[0:35]), min(msg.ranges[324:359])), inf),
+        'fright': min(min(msg.ranges[288:323]), inf),
+        'right': min(min(msg.ranges[252:287]), inf),
     }
 
-    dist_right = min(min(msg.ranges[16:90]), 3.6)
-    dist_left = min(min(msg.ranges[270:345]), 3.6)
+    dist_right = min(min(msg.ranges[16:90]), inf)
+    dist_left = min(min(msg.ranges[270:345]), inf)
 
     take_action()
 
 
 def clbk_drive(msg):
+    """
+    Callback for the /start_stop service topic
+    Starts/Pauses the roboters activities based on the given Value{True, False}
+    """
     global startStop_
     startStop_ = msg.data
 
@@ -131,27 +148,22 @@ def entry_markers(x, y):
 
 
 def find_entry():
+    global max_speed
     msg = Twist()
-    msg.linear.x = 0.2
+    msg.linear.x = max_speed
     return msg
 
 
 def main():
-    global pub_cmd_vel_, pub_entry_, active_, pub_visualization_marker_entries_
+    global hz, active_
 
     rospy.init_node('find_the_entry')
 
-    srv = rospy.Service('find_the_entry_switch', SetBool, find_the_entry_switch)
+    init_services()
+    init_publisher()
+    init_subscribers()
 
-    pub_cmd_vel_ = rospy.Publisher('/cmd_vel', Twist, queue_size=1)
-    pub_visualization_marker_entries_ = rospy.Publisher("/visualization_marker_array", MarkerArray, queue_size=2)
-    pub_entry_ = rospy.Publisher('/entry', Bool, queue_size=1)
-
-    sub_scan = rospy.Subscriber('/scan', LaserScan, clbk_laser)
-    sub_odom = rospy.Subscriber('/odom', Odometry, clbk_odom)
-    sub_drive = rospy.Subscriber('/start_stop', Bool, clbk_drive)
-
-    rate = rospy.Rate(1)
+    rate = rospy.Rate(hz)
     while not rospy.is_shutdown():
 
         msg = Twist()
@@ -165,6 +177,36 @@ def main():
         pub_cmd_vel_.publish(msg)
 
         rate.sleep()
+
+
+def init_publisher():
+    """
+    Initializes Publisher:
+    pub_path_change: Publishes to /path_change and executes clbk_laser
+    """
+    global pub_cmd_vel_, pub_visualization_marker_entries_, pub_entry_
+    pub_cmd_vel_ = rospy.Publisher('/cmd_vel', Twist, queue_size=1)
+    pub_visualization_marker_entries_ = rospy.Publisher("/visualization_marker_array", MarkerArray, queue_size=2)
+    pub_entry_ = rospy.Publisher('/entry', Bool, queue_size=1)
+
+
+def init_subscribers():
+    """
+    Initializes Subscribers:
+    sub_laser: Subscribes to /scan and executes clbk_laser
+    sub_drive: Subscribes to /start_stop and executes clbk_drive
+    sub_odom: Subscribes to /odom and executes clbk_position
+    """
+    sub_scan = rospy.Subscriber('/scan', LaserScan, clbk_laser)
+    sub_drive = rospy.Subscriber('/start_stop', Bool, clbk_drive)
+    sub_odom = rospy.Subscriber('/odom', Odometry, clbk_position)
+
+
+def init_services():
+    """
+    Initializes service:
+    """
+    srv = rospy.Service('find_the_entry_switch', SetBool, find_the_entry_switch)
 
 
 if __name__ == '__main__':
