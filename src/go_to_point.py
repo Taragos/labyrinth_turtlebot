@@ -19,8 +19,8 @@ state_ = 2
 desired_position_ = Point()
 desired_position_.z = 0
 # parameters
-yaw_precision_ = math.pi / 90  # +/- 2 degree allowed
-dist_precision_ = 0.3
+yaw_precision_ = math.pi / 70  # +/- 2 degree allowed
+dist_precision_ = 0.01
 active_ = False
 startStop_ = False
 corner_count_ = 0
@@ -111,7 +111,7 @@ def go_straight_ahead(des_pos):
 
     if err_pos > dist_precision_:
         twist_msg = Twist()
-        twist_msg.linear.x = 0.2
+        twist_msg.linear.x = 0.1
         twist_msg.angular.z = 0.2 if err_yaw > 0 else -0.2
         pub_cmd_.publish(twist_msg)
     else:
@@ -120,7 +120,7 @@ def go_straight_ahead(des_pos):
 
     # state change conditions
     if math.fabs(err_yaw) > yaw_precision_:
-        rospy.logerr('Yaw error: [%s]' % err_yaw)
+        rospy.logerr('Yaw error in ahead: [%s]' % err_yaw)
         change_state(0)
 
 
@@ -129,7 +129,7 @@ def set_destination():
     # Get destination coordinates
     if rospy.has_param('/path_corner_points'):
         path_corners = rospy.get_param("/path_corner_points")
-    # if final destination reached stop the robot
+        # if final destination reached stop the robot
     if corner_count_ >= len(path_corners):
         twist_msg = Twist()
         twist_msg.linear.x = 0
@@ -142,6 +142,7 @@ def set_destination():
         desired_position_.y = path_corners[corner_count_]["y"]
         corner_count_ = corner_count_ + 1
         change_state(0)
+
 
 
 def main():

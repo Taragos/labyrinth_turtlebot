@@ -5,6 +5,7 @@ from geometry_msgs.msg import Point
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Bool
 from std_srvs.srv import SetBool, SetBoolResponse
+from visualization_msgs.msg import Marker, MarkerArray
 
 # Services
 from tf.transformations import euler_from_quaternion
@@ -25,7 +26,7 @@ path = None
 startStop_ = False
 in_lab_ = False
 entry_found_ = False
-a_star_ = False
+a_star_ = True
 path_found_ = False
 
 # Robot position
@@ -66,10 +67,10 @@ def clbk_path(msg):
     destination_points = []
     pub_path_change.publish(True)
     path_found_ = True
-
+    rospy.loginfo("----------------------------- Path")
     for i in range(len(path)):
         destination_points.append(
-            dict({"x": round(path[i].pose.position.x, 2), "y": round(path[i].pose.position.y, 2)}))
+            dict({"x": round(path[i].pose.position.x, 3), "y": round(path[i].pose.position.y,3)}))
         # if i == 0:
         #     cur = path[i].pose.position
         #     next = path[i + 1].pose.position
@@ -241,7 +242,7 @@ def init_subscribers():
     sub_drive = rospy.Subscriber('/start_stop', Bool, clbk_drive)
     sub_odom = rospy.Subscriber('/odom', Odometry, clbk_position)
     sub_entry = rospy.Subscriber('/entry', Bool, clbk_entry)
-
+    sub_path = rospy.Subscriber('/a_path', MarkerArray, clbk_path)
 
 def init_services():
     """

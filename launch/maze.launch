@@ -3,8 +3,8 @@
 
   <!-- ALL ARGUMENTS-->
   <arg name="model" default="burger" doc="model type [burger, waffle, waffle_pi]"/>
-  <arg name="initial_x" default="11" />
-  <arg name="initial_y" default="8" />
+  <arg name="initial_x" default="2.3" />
+  <arg name="initial_y" default="1.1" />
   <arg name="initial_z" default="0" />
   <arg name="roll" default="0"/>
   <arg name="pitch" default="0"/>
@@ -13,7 +13,7 @@
   <param name="initial_x" value="$(arg initial_x)" />
   <param name="initial_y" value="$(arg initial_y)" />
   <param name="direction" value="$(arg direction)" />
-  <arg name="world" default="challenge_maze_double_entry.world" />
+  <arg name="world" default="final.world" />
   <arg name="scan_topic"  default="/scan" />
   <arg name="base_frame"  default="base_footprint"/>
   <arg name="odom_frame"  default="odom"/>
